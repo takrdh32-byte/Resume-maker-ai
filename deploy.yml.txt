@@ -1,0 +1,150 @@
+name: Deploy AI Resume Builder
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  # ── JOB 1: TEST ─────────────────────────────────────────────────────────
+  test:
+    name: ✅ Test Python Backend
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+
+      - name: Test imports & PDF generation
+        run: |
+          python3 -c "
+          from main import detect_resume_type, build_pdf, ResumeData, WorkExperience, Education
+          import os
+
+          data = ResumeData(
+              full_name='Test User',
+              email='test@test.com',
+              phone='9999999999',
+              location='Mumbai',
+              job_title='Software Engineer',
+              skills='Python, FastAPI, React',
+              work_experience=[WorkExperience(company='TestCorp', role='Dev', duration='2023-Now', description='Built APIs')],
+              education=[Education(institution='IIT', degree='B.Tech', year='2023')]
+          )
+
+          rtype = detect_resume_type(data)
+          print(f'Resume type: {rtype}')
+
+          ai_data = {
+              'summary': 'Test summary',
+              'skills_list': ['Python', 'FastAPI'],
+              'resume_type': rtype,
+              'enhanced_experiences': []
+          }
+
+          os.makedirs('/tmp/resumes', exist_ok=True)
+          build_pdf(data, ai_data, '/tmp/resumes/test.pdf')
+          size = os.path.getsize('/tmp/resumes/test.pdf')
+          print(f'PDF size: {size} bytes')
+          assert size > 1000, 'PDF too small!'
+          print('ALL TESTS PASSED!')
+          "
+
+      - name: Test FastAPI server starts
+        run: |
+          uvicorn main:app --host 0.0.0.0 --port 8000 &
+          sleep 3
+          curl -f http://localhost:8000/health || exit 1
+          echo "Server health check passed!"
+
+  # ── JOB 2: DEPLOY FRONTEND (GitHub Pages) ───────────────────────────────
+  deploy-frontend:
+    name: 🌐 Deploy Frontend to GitHub Pages
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./
+          publish_branch: gh-pages
+          include_files: index.html
+
+  # ── JOB 3: BUILD DOCKER IMAGE ────────────────────────────────────────────
+  build-docker:
+    name: 🐳 Build & Push Docker Image
+    runs-on: ubuntu-latest
+    needs: test
+    if: github.ref == 'refs/heads/main'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+        continue-on-error: true
+
+      - name: Build Docker image
+        run: |
+          docker build -t ai-resume-builder:latest .
+          echo "Docker image built successfully!"
+
+      - name: Push to Docker Hub (if credentials set)
+        run: |
+          if [ -n "${{ secrets.DOCKER_USERNAME }}" ]; then
+            docker tag ai-resume-builder:latest ${{ secrets.DOCKER_USERNAME }}/ai-resume-builder:latest
+            docker push ${{ secrets.DOCKER_USERNAME }}/ai-resume-builder:latest
+            echo "Pushed to Docker Hub!"
+          else
+            echo "Docker Hub credentials not set — skipping push"
+          fi
+        continue-on-error: true
+
+  # ── JOB 4: SUMMARY ──────────────────────────────────────────────────────
+  summary:
+    name: 📋 Build Summary
+    runs-on: ubuntu-latest
+    needs: [test, deploy-frontend]
+    if: always()
+
+    steps:
+      - name: Print summary
+        run: |
+          echo "================================"
+          echo "  AI Resume Builder — CI/CD"
+          echo "================================"
+          echo "✅ Tests:    ${{ needs.test.result }}"
+          echo "🌐 Frontend: ${{ needs.deploy-frontend.result }}"
+          echo "================================"
+          echo "Frontend URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
