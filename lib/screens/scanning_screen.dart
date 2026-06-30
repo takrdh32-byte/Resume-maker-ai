@@ -1,9 +1,9 @@
-// 📄 lib/screens/scanning_screen.dart
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import '../recoverx_bridge.dart';
 import '../services/folder_scanner.dart';
+import '../services/plan_manager.dart';
 import '../models/recovered_photo.dart';
 import 'results_screen.dart';
 
@@ -19,11 +19,14 @@ class _ScanningScreenState extends State<ScanningScreen> {
   String _statusText = 'Scan shuru ho raha hai...';
   bool _scanFailed = false;
   bool _stopped = false;
-  static const int _maxPhotos = 200; // 200 फोटो के बाद ऑटो-स्टॉप
+  late int _maxPhotos;
 
   @override
   void initState() {
     super.initState();
+    // प्लान के हिसाब से फोटो लिमिट तय करो
+    PlanManager.checkExpiry();
+    _maxPhotos = PlanManager.photoLimit;
     _listenToProgress();
     _startRealScan();
   }
@@ -39,12 +42,11 @@ class _ScanningScreenState extends State<ScanningScreen> {
         _found.add(RecoveredPhoto(
           path: path,
           sizeBytes: size,
-          isUnlocked: _found.isEmpty,
+          isUnlocked: PlanManager.isPro || _found.isEmpty, // प्रो या पहली फोटो अनलॉक
         ));
         _statusText = '${_found.length} photos mili...';
       });
 
-      // लिमिट पार होते ही स्कैन बंद करो
       if (_found.length >= _maxPhotos) {
         _stopScan();
       }
@@ -54,19 +56,20 @@ class _ScanningScreenState extends State<ScanningScreen> {
   Future<void> _startRealScan() async {
     try {
       final outputDir = await _getOutputDir();
+      final started = await RecoverXBridge.startScanSession(outputDir: outputDir);
+      if (!started) throw Exception("Session start failed");
+
       final files = await FolderScanner.collectFiles();
       if (files.isEmpty || _stopped) {
+        await RecoverXBridge.endScanSession();
         _showResultsIfMounted();
         return;
       }
 
       for (final file in files) {
         if (_stopped) break;
-        await RecoverXBridge.scanFile(
-          sourcePath: file.path,
-          outputDir: outputDir,
-        );
-        if (_found.length >= _maxPhotos) break; // लिमिट के बाद लूप तोड़ो
+        await RecoverXBridge.scanFileInSession(sourcePath: file.path);
+        if (_found.length >= _maxPhotos) break;
       }
     } catch (e) {
       if (!mounted) return;
@@ -75,10 +78,10 @@ class _ScanningScreenState extends State<ScanningScreen> {
         _scanFailed = true;
       });
       return;
+    } finally {
+      await RecoverXBridge.endScanSession();
     }
-    if (!_stopped) {
-      _showResultsIfMounted();
-    }
+    if (!_stopped) _showResultsIfMounted();
   }
 
   void _showResultsIfMounted() {
@@ -116,76 +119,49 @@ class _ScanningScreenState extends State<ScanningScreen> {
             children: [
               if (!_scanFailed && !_stopped) ...[
                 const SizedBox(
-                  width: 64,
-                  height: 64,
-                  child: CircularProgressIndicator(
-                      strokeWidth: 4, color: Color(0xFF58A6FF)),
+                  width: 64, height: 64,
+                  child: CircularProgressIndicator(strokeWidth: 4, color: Color(0xFF58A6FF)),
                 ),
                 const SizedBox(height: 24),
-                Text(
-                  _statusText,
-                  style: const TextStyle(
-                      fontSize: 18,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500),
-                ),
+                Text(_statusText,
+                    style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w500)),
                 const SizedBox(height: 8),
-                const Text(
-                  'Phone ko hilao mat, scan chal raha hai',
-                  style: TextStyle(fontSize: 13, color: Colors.white38),
-                ),
+                const Text('Phone ko hilao mat, scan chal raha hai',
+                    style: TextStyle(fontSize: 13, color: Colors.white38)),
                 const SizedBox(height: 32),
                 SizedBox(
                   width: double.infinity,
                   height: 48,
                   child: ElevatedButton(
                     onPressed: _stopScan,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.redAccent,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: const Text(
-                      'Stop Scan',
-                      style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.white),
-                    ),
+                    style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                    child: const Text('Stop Scan',
+                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
                   ),
                 ),
               ] else if (_stopped) ...[
-                const Icon(Icons.check_circle_outline,
-                    size: 56, color: Color(0xFF58A6FF)),
+                const Icon(Icons.check_circle_outline, size: 56, color: Color(0xFF58A6FF)),
                 const SizedBox(height: 16),
-                Text(
-                  'Scan ruk gaya. ${_found.length} photos mili.',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.white, fontSize: 16),
-                ),
+                Text('Scan ruk gaya. ${_found.length} photos mili.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white, fontSize: 16)),
                 const SizedBox(height: 24),
                 ElevatedButton(
                   onPressed: () {
                     Navigator.pushReplacement(
                       context,
-                      MaterialPageRoute(
-                          builder: (_) => ResultsScreen(photos: _found)),
+                      MaterialPageRoute(builder: (_) => ResultsScreen(photos: _found)),
                     );
                   },
                   child: const Text('Dekho'),
                 ),
               ] else ...[
-                const Icon(Icons.error_outline,
-                    size: 56, color: Colors.redAccent),
+                const Icon(Icons.error_outline, size: 56, color: Colors.redAccent),
                 const SizedBox(height: 16),
-                Text(_statusText,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white)),
+                Text(_statusText, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white)),
                 const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Wapas Jao'),
-                ),
+                ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('Wapas Jao')),
               ],
             ],
           ),
