@@ -2,7 +2,7 @@
 import 'dart:io';
 
 class FolderScanner {
-  // ये वो सभी पब्लिक फोल्डर हैं जहाँ आमतौर पर फ़ोटो/वीडियो रहते हैं
+  // ज़्यादातर फ़ोटो/वीडियो वाले पब्लिक फोल्डर
   static const List<String> _scanFolders = [
     '/storage/emulated/0/DCIM',
     '/storage/emulated/0/Pictures',
@@ -14,7 +14,10 @@ class FolderScanner {
     '/storage/emulated/0/Movies',
   ];
 
-  // हर फोल्डर को रीकर्सिवली घूमता है और सभी फ़ाइलों की लिस्ट बनाता है
+  // 100MB से बड़ी फ़ाइलें skip करेंगे (क्योंकि scanFile की सीमा 100MB है)
+  static const int _maxFileSize = 100 * 1024 * 1024; // 100MB
+
+  // सभी फ़ोल्डरों को रीकर्सिवली घूमकर छोटी फ़ाइलों की लिस्ट बनाएँ
   static Future<List<File>> collectFiles() async {
     final List<File> allFiles = [];
     for (final folderPath in _scanFolders) {
@@ -26,14 +29,18 @@ class FolderScanner {
     return allFiles;
   }
 
-  // फोल्डर के अंदर घुसकर सभी फ़ाइलें इकट्ठा करता है (10 लेवल तक)
+  // रीकर्सिव फंक्शन — सिर्फ़ मान्य JPEG फ़ाइलें (और जिनका साइज़ 100MB से कम) इकट्ठा करता है
   static Future<void> _scanRecursive(Directory dir, List<File> collector,
       {int depth = 0}) async {
     if (depth > 10) return; // बहुत गहराई में मत जाओ
     try {
       await for (final entity in dir.list(recursive: false, followLinks: false)) {
         if (entity is File) {
-          collector.add(entity);
+          // फ़ाइल का साइज़ चेक करो — बड़ी फ़ाइलों को स्किप करो
+          final length = await entity.length();
+          if (length > 0 && length <= _maxFileSize) {
+            collector.add(entity);
+          }
         } else if (entity is Directory) {
           await _scanRecursive(entity, collector, depth: depth + 1);
         }
