@@ -2,6 +2,7 @@ import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../models/recovered_photo.dart';
+import '../services/plan_manager.dart';
 import 'paywall_screen.dart';
 
 class ResultsScreen extends StatefulWidget {
@@ -13,14 +14,16 @@ class ResultsScreen extends StatefulWidget {
 }
 
 class _ResultsScreenState extends State<ResultsScreen> {
-  bool _isPro = false;
+  bool _isPro = PlanManager.isPro;
 
   void _onLockedPhotoTap() {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => PaywallScreen(
         onUnlocked: () {
-          setState(() => _isPro = true);
+          setState(() {
+            _isPro = PlanManager.isPro; // ताज़ा प्लान
+          });
         },
       )),
     );
@@ -54,7 +57,9 @@ class _ResultsScreenState extends State<ResultsScreen> {
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
-                      Image.file(File(photo.path), fit: BoxFit.cover,
+                      Image.file(
+                        File(photo.path),
+                        fit: BoxFit.cover,
                         errorBuilder: (_, __, ___) => Container(
                           color: Colors.grey.shade800,
                           child: const Icon(Icons.broken_image, color: Colors.white24),
