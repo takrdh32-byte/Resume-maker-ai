@@ -24,22 +24,26 @@ jobs:
       - name: Create Flutter project (v2 embedding by default)
         run: flutter create --org com.recoverx.app --project-name recoverx .
 
-      # ज़रूरी डायरेक्टरी बनाओ ताकि कॉपी कर सको
-      - name: Ensure destination directories exist
-        run: mkdir -p recoverx/android/app/src/main
-
-      # अब अपनी कस्टम फ़ाइलें एक-एक करके सही जगह लगाओ
+      # हर कॉपी से पहले डायरेक्टरी बनाएँ — सबसे सुरक्षित तरीका
       - name: Copy custom AndroidManifest
-        run: cp android/app/src/main/AndroidManifest.xml recoverx/android/app/src/main/
+        run: |
+          mkdir -p recoverx/android/app/src/main
+          cp android/app/src/main/AndroidManifest.xml recoverx/android/app/src/main/
 
       - name: Copy custom build.gradle
-        run: cp android/app/build.gradle recoverx/android/app/
+        run: |
+          mkdir -p recoverx/android/app
+          cp android/app/build.gradle recoverx/android/app/
 
       - name: Copy native C++ sources
-        run: cp -r android/app/src/main/cpp recoverx/android/app/src/main/cpp
+        run: |
+          mkdir -p recoverx/android/app/src/main/cpp
+          cp -r android/app/src/main/cpp/* recoverx/android/app/src/main/cpp/
 
       - name: Copy Kotlin sources
-        run: cp -r android/app/src/main/kotlin recoverx/android/app/src/main/kotlin
+        run: |
+          mkdir -p recoverx/android/app/src/main/kotlin
+          cp -r android/app/src/main/kotlin/* recoverx/android/app/src/main/kotlin/
 
       - name: Copy Flutter lib and pubspec
         run: |
