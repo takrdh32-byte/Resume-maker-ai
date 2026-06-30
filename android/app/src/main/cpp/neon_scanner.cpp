@@ -81,8 +81,16 @@ bool findFooter2(const uint8_t* buffer, size_t bufferSize, size_t startFrom,
     return findFooter2Scalar(buffer, bufferSize, i, pattern, foundPos);
 }
 #else
-bool findHeader4(...) { return findHeader4Scalar(...); }
-bool findFooter2(...) { return findFooter2Scalar(...); }
+// गैर-ARM (x86, x86_64) के लिए सीधे scalar फ़ॉलबैक
+bool findHeader4(const uint8_t* buffer, size_t bufferSize, size_t startFrom,
+                  const uint8_t pattern[4], size_t& foundPos) {
+    return findHeader4Scalar(buffer, bufferSize, startFrom, pattern, foundPos);
+}
+
+bool findFooter2(const uint8_t* buffer, size_t bufferSize, size_t startFrom,
+                  const uint8_t pattern[2], size_t& foundPos) {
+    return findFooter2Scalar(buffer, bufferSize, startFrom, pattern, foundPos);
+}
 #endif
 
 } // namespace
