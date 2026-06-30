@@ -26,7 +26,6 @@ jobs:
           rm -rf /tmp/build
           flutter create --org com.recoverx.app --project-name recoverx /tmp/build
 
-      # हर कॉपी से पहले डायरेक्टरी बनाओ — कोई एरर नहीं
       - name: Copy custom AndroidManifest
         run: |
           mkdir -p /tmp/build/android/app/src/main
