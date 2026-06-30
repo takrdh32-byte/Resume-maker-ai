@@ -51,6 +51,13 @@ class _ScanningScreenState extends State<ScanningScreen> {
   }
 
   Future<void> _startRealScan() async {
+    // अगर प्रो नहीं है और फ्री यूज़ भी हो चुका है, तो वापस भेजो
+    if (!PlanManager.isPro && await PlanManager.hasUsedFree()) {
+      if (!mounted) return;
+      _stopScan();
+      return;
+    }
+
     try {
       final outputDir = await _getOutputDir();
       final started = await RecoverXBridge.startScanSession(outputDir: outputDir);
@@ -79,6 +86,11 @@ class _ScanningScreenState extends State<ScanningScreen> {
       final newPaths = _found.map((p) => p.path).toList();
       savedPaths.addAll(newPaths);
       await prefs.setStringList('recovered_paths', savedPaths);
+
+      // फ्री फोटो दिखाने के बाद मार्क करो (अगर फ्री प्लान हो)
+      if (!PlanManager.isPro) {
+        await PlanManager.markUsedFree();
+      }
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -124,25 +136,68 @@ class _ScanningScreenState extends State<ScanningScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (!_scanFailed && !_stopped) ...[
-                const SizedBox(width: 64, height: 64, child: CircularProgressIndicator(strokeWidth: 4, color: Color(0xFF6C63FF))),
+                const SizedBox(
+                  width: 64,
+                  height: 64,
+                  child: CircularProgressIndicator(strokeWidth: 4, color: Color(0xFF6C63FF)),
+                ),
                 const SizedBox(height: 24),
-                Text(_statusText, style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w500)),
+                Text(
+                  _statusText,
+                  style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w500),
+                ),
                 const SizedBox(height: 8),
-                Text('Phone ko hilao mat, scan chal raha hai', style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.4))),
+                Text(
+                  'Phone ko hilao mat, scan chal raha hai',
+                  style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.4)),
+                ),
                 const SizedBox(height: 32),
-                SizedBox(width: double.infinity, height: 48, child: ElevatedButton(onPressed: _stopScan, style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), child: const Text('Stop Scan', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)))),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: ElevatedButton(
+                    onPressed: _stopScan,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.redAccent,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: const Text(
+                      'Stop Scan',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white),
+                    ),
+                  ),
+                ),
               ] else if (_stopped) ...[
                 const Icon(Icons.check_circle_outline, size: 56, color: Color(0xFF6C63FF)),
                 const SizedBox(height: 16),
-                Text('Scan ruk gaya. ${_found.length} photos mili.', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 16)),
+                Text(
+                  'Scan ruk gaya. ${_found.length} photos mili.',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white, fontSize: 16),
+                ),
                 const SizedBox(height: 24),
-                ElevatedButton(onPressed: () { Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => ResultsScreen(photos: _found))); }, child: const Text('Dekho')),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pushReplacement(
+                      context,
+                      MaterialPageRoute(builder: (_) => ResultsScreen(photos: _found)),
+                    );
+                  },
+                  child: const Text('Dekho'),
+                ),
               ] else ...[
                 const Icon(Icons.error_outline, size: 56, color: Colors.redAccent),
                 const SizedBox(height: 16),
-                Text(_statusText, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white)),
+                Text(
+                  _statusText,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.white),
+                ),
                 const SizedBox(height: 24),
-                ElevatedButton(onPressed: () => Navigator.pop(context), child: const Text('Wapas Jao')),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Wapas Jao'),
+                ),
               ],
             ],
           ),
