@@ -21,7 +21,6 @@ class MainActivity : FlutterActivity() {
         init { System.loadLibrary("recoverx_native") }
     }
 
-    // JNI functions – C++ side
     external fun getEngineVersion(): String
     external fun initCarver(outputDir: String, ramTier: Int)
     external fun releaseCarver()
@@ -30,23 +29,15 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        // Real-time progress stream
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, EVENT_CHANNEL)
             .setStreamHandler(object : EventChannel.StreamHandler {
-                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
-                    progressSink = events
-                }
-                override fun onCancel(arguments: Any?) {
-                    progressSink = null
-                }
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) { progressSink = events }
+                override fun onCancel(arguments: Any?) { progressSink = null }
             })
 
-        // JNI callback – when a photo is found, send to Flutter
         val fileListener = object : CarvedFileListener {
             override fun onFileFound(path: String, sizeBytes: Long) {
-                mainHandler.post {
-                    progressSink?.success(mapOf("path" to path, "size" to sizeBytes))
-                }
+                mainHandler.post { progressSink?.success(mapOf("path" to path, "size" to sizeBytes)) }
             }
         }
 
@@ -54,14 +45,10 @@ class MainActivity : FlutterActivity() {
             .setMethodCallHandler { call, result ->
                 when (call.method) {
                     "getEngineVersion" -> {
-                        try {
-                            result.success(getEngineVersion())
-                        } catch (e: Exception) {
-                            result.error("NATIVE_ERROR", e.message, null)
-                        }
+                        try { result.success(getEngineVersion()) }
+                        catch (e: Exception) { result.error("NATIVE_ERROR", e.message, null) }
                     }
 
-                    // ---- NEW SESSION METHODS ----
                     "startScanSession" -> {
                         val outputDir = call.argument<String>("outputDir") ?: ""
                         if (outputDir.isEmpty()) {
