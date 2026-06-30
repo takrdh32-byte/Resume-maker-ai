@@ -1,4 +1,4 @@
-name: Build Debug APK
+name: Build Debug APK (Real Engine)
 
 on:
   push:
@@ -18,19 +18,26 @@ jobs:
           flutter-version: '3.22.0'
           channel: 'stable'
 
-      # नया Flutter प्रोजेक्ट बनाएँ ताकि android/ फोल्डर और Gradle फ़ाइलें आ जाएँ
-      - name: Create Flutter Android project
-        run: |
-          flutter create --org com.recoverx.app --project-name recoverx .
-          # तुम्हारे पुराने Dart कोड को इस नए प्रोजेक्ट में रख दो
-          cp -r lib/ recoverx/lib/
-          cp pubspec.yaml recoverx/
-          cd recoverx
+      - name: Setup Android SDK & NDK
+        uses: android-actions/setup-android@v3
 
-      - name: Install Dependencies
+      - name: Create Flutter project
+        run: flutter create --org com.recoverx.app --project-name recoverx .
+
+      - name: Copy lib and pubspec
+        run: |
+          cp -r lib recoverx/
+          cp pubspec.yaml recoverx/
+
+      - name: Copy native C++ and Kotlin sources
+        run: |
+          cp -r android/app/src/main recoverx/android/app/src/
+          cp android/app/build.gradle recoverx/android/app/
+
+      - name: Install Flutter dependencies
         run: cd recoverx && flutter pub get
 
-      - name: Build APK (Debug)
+      - name: Build APK (Debug with native)
         run: cd recoverx && flutter build apk --debug
 
       - name: Upload APK
