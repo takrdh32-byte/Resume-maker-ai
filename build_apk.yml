@@ -21,22 +21,30 @@ jobs:
       - name: Setup Android SDK & NDK
         uses: android-actions/setup-android@v3
 
-      - name: Create Flutter project
+      - name: Create Flutter project (v2 embedding by default)
         run: flutter create --org com.recoverx.app --project-name recoverx .
 
-      - name: Remove default Android sources (v2 conflict)
-        run: rm -rf recoverx/android/app/src/main
+      # ज़रूरी डायरेक्टरी बनाओ ताकि कॉपी कर सको
+      - name: Ensure destination directories exist
+        run: mkdir -p recoverx/android/app/src/main
 
-      - name: Copy our complete Android sources
-        run: cp -r android/app/src/main recoverx/android/app/src/
+      # अब अपनी कस्टम फ़ाइलें एक-एक करके सही जगह लगाओ
+      - name: Copy custom AndroidManifest
+        run: cp android/app/src/main/AndroidManifest.xml recoverx/android/app/src/main/
+
+      - name: Copy custom build.gradle
+        run: cp android/app/build.gradle recoverx/android/app/
+
+      - name: Copy native C++ sources
+        run: cp -r android/app/src/main/cpp recoverx/android/app/src/main/cpp
+
+      - name: Copy Kotlin sources
+        run: cp -r android/app/src/main/kotlin recoverx/android/app/src/main/kotlin
 
       - name: Copy Flutter lib and pubspec
         run: |
           cp -r lib recoverx/
           cp pubspec.yaml recoverx/
-
-      - name: Copy our custom build.gradle
-        run: cp android/app/build.gradle recoverx/android/app/
 
       - name: Install Flutter dependencies
         run: cd recoverx && flutter pub get
