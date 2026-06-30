@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../recoverx_bridge.dart';
 import '../services/folder_scanner.dart';
 import '../services/plan_manager.dart';
@@ -9,6 +10,7 @@ import 'results_screen.dart';
 
 class ScanningScreen extends StatefulWidget {
   const ScanningScreen({super.key});
+
   @override
   State<ScanningScreen> createState() => _ScanningScreenState();
 }
@@ -54,7 +56,13 @@ class _ScanningScreenState extends State<ScanningScreen> {
       final started = await RecoverXBridge.startScanSession(outputDir: outputDir);
       if (!started) throw Exception("Session start failed");
 
-      final files = await FolderScanner.collectFiles();
+      // पहले से रिकवर हो चुकी फ़ाइलों के पथ लोड करो
+      final prefs = await SharedPreferences.getInstance();
+      final savedPaths = prefs.getStringList('recovered_paths') ?? [];
+      final excludeSet = savedPaths.toSet();
+
+      // नई फ़ाइलों को छोड़कर बाकी स्कैन करो
+      final files = await FolderScanner.collectFiles(excludePaths: excludeSet);
       if (files.isEmpty || _stopped) {
         await RecoverXBridge.endScanSession();
         _showResultsIfMounted();
@@ -66,9 +74,17 @@ class _ScanningScreenState extends State<ScanningScreen> {
         await RecoverXBridge.scanFileInSession(sourcePath: file.path);
         if (_found.length >= _maxPhotos) break;
       }
+
+      // अभी जो नई फ़ाइलें मिली हैं, उनके पथ सेव करो
+      final newPaths = _found.map((p) => p.path).toList();
+      savedPaths.addAll(newPaths);
+      await prefs.setStringList('recovered_paths', savedPaths);
     } catch (e) {
       if (!mounted) return;
-      setState(() { _statusText = 'Scan fail hua: $e'; _scanFailed = true; });
+      setState(() {
+        _statusText = 'Scan fail hua: $e';
+        _scanFailed = true;
+      });
       return;
     } finally {
       await RecoverXBridge.endScanSession();
@@ -78,7 +94,10 @@ class _ScanningScreenState extends State<ScanningScreen> {
 
   void _showResultsIfMounted() {
     if (!mounted) return;
-    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => ResultsScreen(photos: _found)));
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (_) => ResultsScreen(photos: _found)),
+    );
   }
 
   void _stopScan() {
