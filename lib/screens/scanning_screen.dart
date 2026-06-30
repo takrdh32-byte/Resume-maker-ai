@@ -9,7 +9,6 @@ import 'results_screen.dart';
 
 class ScanningScreen extends StatefulWidget {
   const ScanningScreen({super.key});
-
   @override
   State<ScanningScreen> createState() => _ScanningScreenState();
 }
@@ -24,7 +23,6 @@ class _ScanningScreenState extends State<ScanningScreen> {
   @override
   void initState() {
     super.initState();
-    // प्लान के हिसाब से फोटो लिमिट तय करो
     PlanManager.checkExpiry();
     _maxPhotos = PlanManager.photoLimit;
     _listenToProgress();
@@ -42,14 +40,11 @@ class _ScanningScreenState extends State<ScanningScreen> {
         _found.add(RecoveredPhoto(
           path: path,
           sizeBytes: size,
-          isUnlocked: PlanManager.isPro || _found.isEmpty, // प्रो या पहली फोटो अनलॉक
+          isUnlocked: PlanManager.isPro || _found.isEmpty,
         ));
         _statusText = '${_found.length} photos mili...';
       });
-
-      if (_found.length >= _maxPhotos) {
-        _stopScan();
-      }
+      if (_found.length >= _maxPhotos) _stopScan();
     });
   }
 
@@ -73,10 +68,7 @@ class _ScanningScreenState extends State<ScanningScreen> {
       }
     } catch (e) {
       if (!mounted) return;
-      setState(() {
-        _statusText = 'Scan fail hua: $e';
-        _scanFailed = true;
-      });
+      setState(() { _statusText = 'Scan fail hua: $e'; _scanFailed = true; });
       return;
     } finally {
       await RecoverXBridge.endScanSession();
@@ -86,10 +78,7 @@ class _ScanningScreenState extends State<ScanningScreen> {
 
   void _showResultsIfMounted() {
     if (!mounted) return;
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (_) => ResultsScreen(photos: _found)),
-    );
+    Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => ResultsScreen(photos: _found)));
   }
 
   void _stopScan() {
@@ -101,16 +90,14 @@ class _ScanningScreenState extends State<ScanningScreen> {
   Future<String> _getOutputDir() async {
     final appDir = await getApplicationDocumentsDirectory();
     final outDir = Directory('${appDir.path}/recovered');
-    if (!await outDir.exists()) {
-      await outDir.create(recursive: true);
-    }
+    if (!await outDir.exists()) await outDir.create(recursive: true);
     return outDir.path;
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1117),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
@@ -118,44 +105,19 @@ class _ScanningScreenState extends State<ScanningScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (!_scanFailed && !_stopped) ...[
-                const SizedBox(
-                  width: 64, height: 64,
-                  child: CircularProgressIndicator(strokeWidth: 4, color: Color(0xFF58A6FF)),
-                ),
+                const SizedBox(width: 64, height: 64, child: CircularProgressIndicator(strokeWidth: 4, color: Color(0xFF6C63FF))),
                 const SizedBox(height: 24),
-                Text(_statusText,
-                    style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w500)),
+                Text(_statusText, style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w500)),
                 const SizedBox(height: 8),
-                const Text('Phone ko hilao mat, scan chal raha hai',
-                    style: TextStyle(fontSize: 13, color: Colors.white38)),
+                Text('Phone ko hilao mat, scan chal raha hai', style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.4))),
                 const SizedBox(height: 32),
-                SizedBox(
-                  width: double.infinity,
-                  height: 48,
-                  child: ElevatedButton(
-                    onPressed: _stopScan,
-                    style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                    child: const Text('Stop Scan',
-                        style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)),
-                  ),
-                ),
+                SizedBox(width: double.infinity, height: 48, child: ElevatedButton(onPressed: _stopScan, style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), child: const Text('Stop Scan', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)))),
               ] else if (_stopped) ...[
-                const Icon(Icons.check_circle_outline, size: 56, color: Color(0xFF58A6FF)),
+                const Icon(Icons.check_circle_outline, size: 56, color: Color(0xFF6C63FF)),
                 const SizedBox(height: 16),
-                Text('Scan ruk gaya. ${_found.length} photos mili.',
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: Colors.white, fontSize: 16)),
+                Text('Scan ruk gaya. ${_found.length} photos mili.', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 16)),
                 const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pushReplacement(
-                      context,
-                      MaterialPageRoute(builder: (_) => ResultsScreen(photos: _found)),
-                    );
-                  },
-                  child: const Text('Dekho'),
-                ),
+                ElevatedButton(onPressed: () { Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => ResultsScreen(photos: _found))); }, child: const Text('Dekho')),
               ] else ...[
                 const Icon(Icons.error_outline, size: 56, color: Colors.redAccent),
                 const SizedBox(height: 16),
