@@ -21,43 +21,46 @@ jobs:
       - name: Setup Android SDK & NDK
         uses: android-actions/setup-android@v3
 
-      - name: Create Flutter project (v2 embedding by default)
-        run: flutter create --org com.recoverx.app --project-name recoverx .
+      # 1. एक साफ़ सब-डायरेक्टरी में Flutter प्रोजेक्ट बनाओ
+      - name: Create fresh Flutter project
+        run: flutter create --org com.recoverx.app --project-name recoverx ./app_project
 
-      # हर कॉपी से पहले डायरेक्टरी बनाएँ — सबसे सुरक्षित तरीका
+      # 2. अब हर डायरेक्टरी पहले बनाकर फिर कॉपी करो
       - name: Copy custom AndroidManifest
         run: |
-          mkdir -p recoverx/android/app/src/main
-          cp android/app/src/main/AndroidManifest.xml recoverx/android/app/src/main/
+          mkdir -p app_project/android/app/src/main
+          cp android/app/src/main/AndroidManifest.xml app_project/android/app/src/main/
 
       - name: Copy custom build.gradle
         run: |
-          mkdir -p recoverx/android/app
-          cp android/app/build.gradle recoverx/android/app/
+          mkdir -p app_project/android/app
+          cp android/app/build.gradle app_project/android/app/
 
       - name: Copy native C++ sources
         run: |
-          mkdir -p recoverx/android/app/src/main/cpp
-          cp -r android/app/src/main/cpp/* recoverx/android/app/src/main/cpp/
+          mkdir -p app_project/android/app/src/main/cpp
+          cp -r android/app/src/main/cpp/* app_project/android/app/src/main/cpp/
 
       - name: Copy Kotlin sources
         run: |
-          mkdir -p recoverx/android/app/src/main/kotlin
-          cp -r android/app/src/main/kotlin/* recoverx/android/app/src/main/kotlin/
+          mkdir -p app_project/android/app/src/main/kotlin
+          cp -r android/app/src/main/kotlin/* app_project/android/app/src/main/kotlin/
 
-      - name: Copy Flutter lib and pubspec
+      # 3. Flutter फ़ाइलें (lib और pubspec) — पूरा lib फोल्डर कॉपी करें, pubspec भी
+      - name: Copy Flutter sources
         run: |
-          cp -r lib recoverx/
-          cp pubspec.yaml recoverx/
+          rm -rf app_project/lib
+          cp -r lib app_project/lib
+          cp pubspec.yaml app_project/
 
       - name: Install Flutter dependencies
-        run: cd recoverx && flutter pub get
+        run: cd app_project && flutter pub get
 
       - name: Build APK (Debug with native)
-        run: cd recoverx && flutter build apk --debug
+        run: cd app_project && flutter build apk --debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: recoverx-debug-apk
-          path: recoverx/build/app/outputs/flutter-apk/app-debug.apk
+          path: app_project/build/app/outputs/flutter-apk/app-debug.apk
