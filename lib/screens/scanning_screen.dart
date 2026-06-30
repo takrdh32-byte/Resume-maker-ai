@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
-import '../mocks/mock_recoverx_bridge.dart'; // Mock Bridge
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import '../recoverx_bridge.dart';           // असली ब्रिज
+import '../services/folder_scanner.dart';   // ऑटो फोल्डर स्कैनर
 import '../models/recovered_photo.dart';
 import 'results_screen.dart';
 
@@ -19,11 +22,11 @@ class _ScanningScreenState extends State<ScanningScreen> {
   void initState() {
     super.initState();
     _listenToProgress();
-    _startMockScan();
+    _startRealScan();
   }
 
   void _listenToProgress() {
-    MockRecoverXBridge.scanProgressStream.listen((event) {
+    RecoverXBridge.scanProgressStream.listen((event) {
       if (!mounted) return;
       final path = event['path'] as String?;
       final size = event['size'] as int?;
@@ -33,18 +36,37 @@ class _ScanningScreenState extends State<ScanningScreen> {
         _found.add(RecoveredPhoto(
           path: path,
           sizeBytes: size,
-          isUnlocked: _found.isEmpty, // पहली फोटो फ्री
+          isUnlocked: _found.isEmpty,
         ));
         _statusText = '${_found.length} photos mili...';
       });
     });
   }
 
-  Future<void> _startMockScan() async {
+  Future<void> _startRealScan() async {
     try {
-      // सिर्फ इवेंट स्ट्रीम चालू करने के लिए scanAll() कॉल करो
-      await MockRecoverXBridge.scanAll();
+      final outputDir = await _getOutputDir();
 
+      // 1. फ़ोन के पब्लिक फोल्डर से सारी फ़ाइलें इकट्ठा करो
+      final files = await FolderScanner.collectFiles();
+      if (files.isEmpty) {
+        setState(() {
+          _statusText = 'Koi scan karne layak file nahi mili';
+          _scanFailed = true;
+        });
+        return;
+      }
+
+      // 2. हर फ़ाइल को असली C++ इंजन से स्कैन करो
+      for (final file in files) {
+        await RecoverXBridge.scanFile(
+          sourcePath: file.path,
+          outputDir: outputDir,
+        );
+        if (!mounted) return;
+      }
+
+      // 3. स्कैन पूरा होने पर रिज़ल्ट स्क्रीन पर ले जाओ
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
@@ -57,6 +79,15 @@ class _ScanningScreenState extends State<ScanningScreen> {
         _scanFailed = true;
       });
     }
+  }
+
+  Future<String> _getOutputDir() async {
+    final appDir = await getApplicationDocumentsDirectory();
+    final outDir = Directory('${appDir.path}/recovered');
+    if (!await outDir.exists()) {
+      await outDir.create(recursive: true);
+    }
+    return outDir.path;
   }
 
   @override
