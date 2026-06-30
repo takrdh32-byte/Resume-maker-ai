@@ -21,35 +21,63 @@ jobs:
       - name: Setup Android SDK & NDK
         uses: android-actions/setup-android@v3
 
-      - name: Create Flutter project (v2 embedding by default)
-        run: flutter create --org com.recoverx.app --project-name recoverx .
+      - name: Create fresh Flutter project in /tmp/build
+        run: |
+          rm -rf /tmp/build
+          flutter create --org com.recoverx.app --project-name recoverx /tmp/build
 
-      # सिर्फ़ अपनी कस्टम फ़ाइलें कॉपी करो, पूरा main फोल्डर मत हटाओ
       - name: Copy custom AndroidManifest
-        run: cp android/app/src/main/AndroidManifest.xml recoverx/android/app/src/main/
+        run: |
+          mkdir -p /tmp/build/android/app/src/main
+          if [ -f android/app/src/main/AndroidManifest.xml ]; then
+            cp android/app/src/main/AndroidManifest.xml /tmp/build/android/app/src/main/
+          else
+            echo "Warning: AndroidManifest.xml not found, using default"
+          fi
 
       - name: Copy custom build.gradle
-        run: cp android/app/build.gradle recoverx/android/app/
+        run: |
+          mkdir -p /tmp/build/android/app
+          if [ -f android/app/build.gradle ]; then
+            cp android/app/build.gradle /tmp/build/android/app/
+          else
+            echo "Warning: build.gradle not found, using default"
+          fi
 
       - name: Copy native C++ sources
-        run: cp -r android/app/src/main/cpp recoverx/android/app/src/main/cpp
+        run: |
+          mkdir -p /tmp/build/android/app/src/main/cpp
+          if [ -d android/app/src/main/cpp ]; then
+            cp -r android/app/src/main/cpp/* /tmp/build/android/app/src/main/cpp/
+          else
+            echo "Warning: cpp folder not found"
+          fi
 
       - name: Copy Kotlin sources
-        run: cp -r android/app/src/main/kotlin recoverx/android/app/src/main/kotlin
+        run: |
+          mkdir -p /tmp/build/android/app/src/main/kotlin
+          if [ -d android/app/src/main/kotlin ]; then
+            cp -r android/app/src/main/kotlin/* /tmp/build/android/app/src/main/kotlin/
+          else
+            echo "Warning: kotlin folder not found"
+          fi
 
       - name: Copy Flutter lib and pubspec
         run: |
-          cp -r lib recoverx/
-          cp pubspec.yaml recoverx/
+          rm -rf /tmp/build/lib
+          cp -r lib /tmp/build/lib
+          cp pubspec.yaml /tmp/build/
 
       - name: Install Flutter dependencies
-        run: cd recoverx && flutter pub get
+        working-directory: /tmp/build
+        run: flutter pub get
 
       - name: Build APK (Debug with native)
-        run: cd recoverx && flutter build apk --debug
+        working-directory: /tmp/build
+        run: flutter build apk --debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: recoverx-debug-apk
-          path: recoverx/build/app/outputs/flutter-apk/app-debug.apk
+          path: /tmp/build/build/app/outputs/flutter-apk/app-debug.apk
