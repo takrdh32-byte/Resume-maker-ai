@@ -45,11 +45,12 @@ private:
 
     uint64_t computeHash(const uint8_t* data, size_t length);
     bool isDuplicate(uint64_t hash);
-    bool saveFragment(const uint8_t* data, size_t length, std::string& outPathOut);
+    // अब isJPEG बताना होगा ताकि .jpg या .png एक्सटेंशन सही लगे
+    bool saveFragment(const uint8_t* data, size_t length, std::string& outPathOut, bool isJPEG);
 
     std::vector<CarvedFile> carveBuffer(const uint8_t* data, size_t bufferSize,
                                          CarvedFileCallback onFound,
                                          size_t globalOffset = 0);
 };
 
-#endif // RECOVERX_JPEG_CARVER_H
+#endif
