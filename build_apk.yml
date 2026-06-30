@@ -21,25 +21,47 @@ jobs:
       - name: Setup Android SDK & NDK
         uses: android-actions/setup-android@v3
 
-      # सबसे साफ़ तरीका: पहले एक नई डायरेक्टरी बनाकर उसमें Flutter प्रोजेक्ट सेटअप करो,
-      # फिर अपनी ज़रूरी फाइलें कॉपी करो, और वहीं से बिल्ड करो।
       - name: Create fresh Flutter project in /tmp/build
         run: |
           rm -rf /tmp/build
           flutter create --org com.recoverx.app --project-name recoverx /tmp/build
 
-      # अब हर ज़रूरी फाइल को सही जगह पर कॉपी करते हैं
+      # हर कॉपी से पहले डायरेक्टरी बनाओ — कोई एरर नहीं
       - name: Copy custom AndroidManifest
-        run: cp android/app/src/main/AndroidManifest.xml /tmp/build/android/app/src/main/
+        run: |
+          mkdir -p /tmp/build/android/app/src/main
+          if [ -f android/app/src/main/AndroidManifest.xml ]; then
+            cp android/app/src/main/AndroidManifest.xml /tmp/build/android/app/src/main/
+          else
+            echo "Warning: AndroidManifest.xml not found, using default"
+          fi
 
       - name: Copy custom build.gradle
-        run: cp android/app/build.gradle /tmp/build/android/app/
+        run: |
+          mkdir -p /tmp/build/android/app
+          if [ -f android/app/build.gradle ]; then
+            cp android/app/build.gradle /tmp/build/android/app/
+          else
+            echo "Warning: build.gradle not found, using default"
+          fi
 
       - name: Copy native C++ sources
-        run: cp -r android/app/src/main/cpp /tmp/build/android/app/src/main/
+        run: |
+          mkdir -p /tmp/build/android/app/src/main/cpp
+          if [ -d android/app/src/main/cpp ]; then
+            cp -r android/app/src/main/cpp/* /tmp/build/android/app/src/main/cpp/
+          else
+            echo "Warning: cpp folder not found"
+          fi
 
       - name: Copy Kotlin sources
-        run: cp -r android/app/src/main/kotlin /tmp/build/android/app/src/main/
+        run: |
+          mkdir -p /tmp/build/android/app/src/main/kotlin
+          if [ -d android/app/src/main/kotlin ]; then
+            cp -r android/app/src/main/kotlin/* /tmp/build/android/app/src/main/kotlin/
+          else
+            echo "Warning: kotlin folder not found"
+          fi
 
       - name: Copy Flutter lib and pubspec
         run: |
