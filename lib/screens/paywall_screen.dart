@@ -1,27 +1,19 @@
 import 'package:flutter/material.dart';
+import '../services/plan_manager.dart';
 
 class PaywallScreen extends StatelessWidget {
   final VoidCallback onUnlocked;
   const PaywallScreen({super.key, required this.onUnlocked});
 
   void _purchase(BuildContext context, String plan) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('Payment Flow'),
-        content: Text('$plan ke liye Google Play Billing yahan connect hogi (agla module).'),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              Navigator.pop(context);
-              onUnlocked();
-            },
-            child: const Text('Test Unlock (Dev Only)'),
-          ),
-        ],
-      ),
-    );
+    // मॉक: सीधे प्लान एक्टिवेट करो
+    if (plan == 'daily') {
+      PlanManager.setDailyPlan();
+    } else if (plan == 'monthly') {
+      PlanManager.setMonthlyPlan();
+    }
+    Navigator.pop(context); // paywall बंद
+    onUnlocked();
   }
 
   @override
@@ -39,24 +31,24 @@ class PaywallScreen extends StatelessWidget {
             const Icon(Icons.lock_open_rounded, size: 64, color: Color(0xFF58A6FF)),
             const SizedBox(height: 16),
             const Text(
-              'Sabhi Recovered Photos Unlock Karo',
+              'Unlock More Photos',
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
             ),
             const SizedBox(height: 32),
             _PlanCard(
-              title: 'Weekly Pass',
+              title: '1-Day Pass',
               price: '₹49',
-              subtitle: '7 din ke liye full access',
-              onTap: () => _purchase(context, 'Weekly Pass (₹49)'),
+              subtitle: '50 photos per scan, unlimited scans for 24 hours',
+              onTap: () => _purchase(context, 'daily'),
             ),
             const SizedBox(height: 16),
             _PlanCard(
               title: 'Monthly Pro',
               price: '₹199',
-              subtitle: '30 din ke liye full access + video recovery',
+              subtitle: '200 photos per scan, unlimited scans for 30 days',
               highlighted: true,
-              onTap: () => _purchase(context, 'Monthly Pro (₹199)'),
+              onTap: () => _purchase(context, 'monthly'),
             ),
           ],
         ),
