@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
-import '../recoverx_bridge.dart';
+import '../mocks/mock_recoverx_bridge.dart'; // <-- Mock Bridge
 import '../models/recovered_photo.dart';
 import 'results_screen.dart';
 
@@ -21,11 +21,11 @@ class _ScanningScreenState extends State<ScanningScreen> {
   void initState() {
     super.initState();
     _listenToProgress();
-    _startScan();
+    _startMockScan(); // <-- असली इंजन की जगह मॉक स्कैन
   }
 
   void _listenToProgress() {
-    RecoverXBridge.scanProgressStream.listen((event) {
+    MockRecoverXBridge.scanProgressStream.listen((event) {
       if (!mounted) return;
       final path = event['path'] as String?;
       final size = event['size'] as int?;
@@ -35,31 +35,19 @@ class _ScanningScreenState extends State<ScanningScreen> {
         _found.add(RecoveredPhoto(
           path: path,
           sizeBytes: size,
-          isUnlocked: _found.isEmpty,
+          isUnlocked: _found.isEmpty, // पहली फोटो फ्री
         ));
         _statusText = '${_found.length} photos mili...';
       });
     });
   }
 
-  Future<void> _startScan() async {
+  Future<void> _startMockScan() async {
     try {
-      final outputDir = await _getOutputDir();
-      const sourcePath = '/storage/emulated/0/DCIM/.thumbnails';
-      final sourceFile = Directory(sourcePath);
-      if (!await sourceFile.exists()) {
-        setState(() {
-          _statusText = 'Koi recoverable cache nahi mila';
-          _scanFailed = true;
-        });
-        return;
-      }
+      // नकली फ़ोटो जनरेट करो
+      final mockFiles = await MockRecoverXBridge.scanAll();
 
-      await RecoverXBridge.scanFile(
-        sourcePath: sourcePath,
-        outputDir: outputDir,
-      );
-
+      // स्कैन पूरा होने पर रिज़ल्ट स्क्रीन पर ले जाओ
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
@@ -74,15 +62,6 @@ class _ScanningScreenState extends State<ScanningScreen> {
     }
   }
 
-  Future<String> _getOutputDir() async {
-    final appDir = await getApplicationDocumentsDirectory();
-    final outDir = Directory('${appDir.path}/recovered');
-    if (!await outDir.exists()) {
-      await outDir.create(recursive: true);
-    }
-    return outDir.path;
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -95,13 +74,18 @@ class _ScanningScreenState extends State<ScanningScreen> {
             children: [
               if (!_scanFailed) ...[
                 const SizedBox(
-                  width: 64, height: 64,
-                  child: CircularProgressIndicator(strokeWidth: 4, color: Color(0xFF58A6FF)),
+                  width: 64,
+                  height: 64,
+                  child: CircularProgressIndicator(
+                      strokeWidth: 4, color: Color(0xFF58A6FF)),
                 ),
                 const SizedBox(height: 24),
                 Text(
                   _statusText,
-                  style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w500),
+                  style: const TextStyle(
+                      fontSize: 18,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w500),
                 ),
                 const SizedBox(height: 8),
                 const Text(
@@ -109,9 +93,12 @@ class _ScanningScreenState extends State<ScanningScreen> {
                   style: TextStyle(fontSize: 13, color: Colors.white38),
                 ),
               ] else ...[
-                const Icon(Icons.error_outline, size: 56, color: Colors.redAccent),
+                const Icon(Icons.error_outline,
+                    size: 56, color: Colors.redAccent),
                 const SizedBox(height: 16),
-                Text(_statusText, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white)),
+                Text(_statusText,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: Colors.white)),
                 const SizedBox(height: 24),
                 ElevatedButton(
                   onPressed: () => Navigator.pop(context),
