@@ -1,0 +1,127 @@
+import 'package:flutter/material.dart';
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
+import '../recoverx_bridge.dart';
+import '../models/recovered_photo.dart';
+import 'results_screen.dart';
+
+class ScanningScreen extends StatefulWidget {
+  const ScanningScreen({super.key});
+
+  @override
+  State<ScanningScreen> createState() => _ScanningScreenState();
+}
+
+class _ScanningScreenState extends State<ScanningScreen> {
+  final List<RecoveredPhoto> _found = [];
+  String _statusText = 'Scan shuru ho raha hai...';
+  bool _scanFailed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _listenToProgress();
+    _startScan();
+  }
+
+  void _listenToProgress() {
+    RecoverXBridge.scanProgressStream.listen((event) {
+      if (!mounted) return;
+      final path = event['path'] as String?;
+      final size = event['size'] as int?;
+      if (path == null || size == null) return;
+
+      setState(() {
+        _found.add(RecoveredPhoto(
+          path: path,
+          sizeBytes: size,
+          isUnlocked: _found.isEmpty,
+        ));
+        _statusText = '${_found.length} photos mili...';
+      });
+    });
+  }
+
+  Future<void> _startScan() async {
+    try {
+      final outputDir = await _getOutputDir();
+      const sourcePath = '/storage/emulated/0/DCIM/.thumbnails';
+      final sourceFile = Directory(sourcePath);
+      if (!await sourceFile.exists()) {
+        setState(() {
+          _statusText = 'Koi recoverable cache nahi mila';
+          _scanFailed = true;
+        });
+        return;
+      }
+
+      await RecoverXBridge.scanFile(
+        sourcePath: sourcePath,
+        outputDir: outputDir,
+      );
+
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => ResultsScreen(photos: _found)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _statusText = 'Scan fail hua: $e';
+        _scanFailed = true;
+      });
+    }
+  }
+
+  Future<String> _getOutputDir() async {
+    final appDir = await getApplicationDocumentsDirectory();
+    final outDir = Directory('${appDir.path}/recovered');
+    if (!await outDir.exists()) {
+      await outDir.create(recursive: true);
+    }
+    return outDir.path;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0D1117),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              if (!_scanFailed) ...[
+                const SizedBox(
+                  width: 64, height: 64,
+                  child: CircularProgressIndicator(strokeWidth: 4, color: Color(0xFF58A6FF)),
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  _statusText,
+                  style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w500),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Phone ko hilao mat, scan chal raha hai',
+                  style: TextStyle(fontSize: 13, color: Colors.white38),
+                ),
+              ] else ...[
+                const Icon(Icons.error_outline, size: 56, color: Colors.redAccent),
+                const SizedBox(height: 16),
+                Text(_statusText, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white)),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('Wapas Jao'),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
