@@ -1,4 +1,4 @@
-name: Build Debug APK
+name: Build Debug APK (Real Engine)
 
 on:
   push:
@@ -18,14 +18,38 @@ jobs:
           flutter-version: '3.22.0'
           channel: 'stable'
 
-      - name: Install Dependencies
-        run: flutter pub get
+      - name: Setup Android SDK & NDK
+        uses: android-actions/setup-android@v3
 
-      - name: Build APK (Debug)
-        run: flutter build apk --debug
+      - name: Create Flutter project (v2 embedding by default)
+        run: flutter create --org com.recoverx.app --project-name recoverx .
+
+      # सिर्फ़ अपनी कस्टम फ़ाइलें कॉपी करो, पूरा main फोल्डर मत हटाओ
+      - name: Copy custom AndroidManifest
+        run: cp android/app/src/main/AndroidManifest.xml recoverx/android/app/src/main/
+
+      - name: Copy custom build.gradle
+        run: cp android/app/build.gradle recoverx/android/app/
+
+      - name: Copy native C++ sources
+        run: cp -r android/app/src/main/cpp recoverx/android/app/src/main/cpp
+
+      - name: Copy Kotlin sources
+        run: cp -r android/app/src/main/kotlin recoverx/android/app/src/main/kotlin
+
+      - name: Copy Flutter lib and pubspec
+        run: |
+          cp -r lib recoverx/
+          cp pubspec.yaml recoverx/
+
+      - name: Install Flutter dependencies
+        run: cd recoverx && flutter pub get
+
+      - name: Build APK (Debug with native)
+        run: cd recoverx && flutter build apk --debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: recoverx-debug-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          path: recoverx/build/app/outputs/flutter-apk/app-debug.apk
