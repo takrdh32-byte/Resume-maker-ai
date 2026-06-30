@@ -21,34 +21,42 @@ jobs:
       - name: Setup Android SDK & NDK
         uses: android-actions/setup-android@v3
 
-      # सीधे रिपो के रूट में Flutter प्रोजेक्ट सेटअप करो
-      # इससे android/ फोल्डर और सभी ज़रूरी Gradle फ़ाइलें बनेंगी
-      - name: Create Flutter project in root
-        run: flutter create --org com.recoverx.app --project-name recoverx .
+      # सबसे साफ़ तरीका: पहले एक नई डायरेक्टरी बनाकर उसमें Flutter प्रोजेक्ट सेटअप करो,
+      # फिर अपनी ज़रूरी फाइलें कॉपी करो, और वहीं से बिल्ड करो।
+      - name: Create fresh Flutter project in /tmp/build
+        run: |
+          rm -rf /tmp/build
+          flutter create --org com.recoverx.app --project-name recoverx /tmp/build
 
-      # अब हमारी कस्टम फ़ाइलों को एक-एक करके सही जगह कॉपी करते हैं
+      # अब हर ज़रूरी फाइल को सही जगह पर कॉपी करते हैं
       - name: Copy custom AndroidManifest
-        run: cp android/app/src/main/AndroidManifest.xml android/app/src/main/AndroidManifest.xml 2>/dev/null || true
-      # दरअसल हमारी कस्टम मेनिफ़ेस्ट भी android/app/src/main/ में ही होगी (रिपो में)
-      # इसलिए पहले ही कॉपी हो चुकी होगी, बस सुनिश्चित करना
+        run: cp android/app/src/main/AndroidManifest.xml /tmp/build/android/app/src/main/
 
       - name: Copy custom build.gradle
-        run: cp android/app/build.gradle android/app/build.gradle 2>/dev/null || true
+        run: cp android/app/build.gradle /tmp/build/android/app/
 
       - name: Copy native C++ sources
-        run: cp -r android/app/src/main/cpp/* android/app/src/main/cpp/ 2>/dev/null || true
+        run: cp -r android/app/src/main/cpp /tmp/build/android/app/src/main/
 
       - name: Copy Kotlin sources
-        run: cp -r android/app/src/main/kotlin/* android/app/src/main/kotlin/ 2>/dev/null || true
+        run: cp -r android/app/src/main/kotlin /tmp/build/android/app/src/main/
+
+      - name: Copy Flutter lib and pubspec
+        run: |
+          rm -rf /tmp/build/lib
+          cp -r lib /tmp/build/lib
+          cp pubspec.yaml /tmp/build/
 
       - name: Install Flutter dependencies
+        working-directory: /tmp/build
         run: flutter pub get
 
       - name: Build APK (Debug with native)
+        working-directory: /tmp/build
         run: flutter build apk --debug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: recoverx-debug-apk
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          path: /tmp/build/build/app/outputs/flutter-apk/app-debug.apk
