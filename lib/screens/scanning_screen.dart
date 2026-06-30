@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
-import 'dart:io';
-import 'package:path_provider/path_provider.dart';
-import '../mocks/mock_recoverx_bridge.dart'; // <-- Mock Bridge
+import '../mocks/mock_recoverx_bridge.dart'; // Mock Bridge
 import '../models/recovered_photo.dart';
 import 'results_screen.dart';
 
@@ -21,7 +19,7 @@ class _ScanningScreenState extends State<ScanningScreen> {
   void initState() {
     super.initState();
     _listenToProgress();
-    _startMockScan(); // <-- असली इंजन की जगह मॉक स्कैन
+    _startMockScan();
   }
 
   void _listenToProgress() {
@@ -44,10 +42,9 @@ class _ScanningScreenState extends State<ScanningScreen> {
 
   Future<void> _startMockScan() async {
     try {
-      // नकली फ़ोटो जनरेट करो
-      final mockFiles = await MockRecoverXBridge.scanAll();
+      // सिर्फ इवेंट स्ट्रीम चालू करने के लिए scanAll() कॉल करो
+      await MockRecoverXBridge.scanAll();
 
-      // स्कैन पूरा होने पर रिज़ल्ट स्क्रीन पर ले जाओ
       if (!mounted) return;
       Navigator.pushReplacement(
         context,
