@@ -40,7 +40,6 @@ class _HomeScreenState extends State<HomeScreen> {
       }
       return;
     }
-
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const ScanningScreen()),
@@ -70,48 +69,52 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0D1117),
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.restore_page_rounded, size: 96, color: Color(0xFF58A6FF)),
+              Container(
+                width: 96,
+                height: 96,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(colors: [const Color(0xFF6C63FF).withOpacity(0.2), const Color(0xFF6C63FF).withOpacity(0.05)]),
+                  border: Border.all(color: const Color(0xFF6C63FF).withOpacity(0.3), width: 1.5),
+                ),
+                child: const Icon(Icons.restore_page_rounded, size: 48, color: Color(0xFF6C63FF)),
+              ),
               const SizedBox(height: 24),
               const Text(
                 'RecoverX',
-                style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
+                style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white, letterSpacing: -0.5),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'Deleted photos aur videos turant wapas paao\nBina internet, bina root',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.white60),
+                style: TextStyle(fontSize: 14, color: Colors.white.withOpacity(0.6)),
               ),
               const SizedBox(height: 48),
               _checkingPermission
-                  ? const CircularProgressIndicator(color: Color(0xFF58A6FF))
+                  ? const CircularProgressIndicator(color: Color(0xFF6C63FF))
                   : SizedBox(
                       width: double.infinity,
                       height: 56,
                       child: ElevatedButton(
                         onPressed: _permissionGranted ? _onStartRecoveryPressed : null,
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFF238636),
+                          backgroundColor: const Color(0xFF6C63FF),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                         ),
-                        child: const Text(
-                          'Start Recovery',
-                          style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Colors.white),
-                        ),
+                        child: const Text('Start Recovery', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Colors.white)),
                       ),
                     ),
               const SizedBox(height: 16),
-              const Text(
-                '100% offline — koi data server par nahi jaata',
-                style: TextStyle(fontSize: 12, color: Colors.white38),
-              ),
+              Text('100% offline — koi data server par nahi jaata',
+                  style: TextStyle(fontSize: 12, color: Colors.white.withOpacity(0.3))),
             ],
           ),
         ),
