@@ -11,11 +11,26 @@ class RecoverXApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Offline RecoverX',
+      title: 'RecoverX',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF0D1117),
-        primaryColor: const Color(0xFF58A6FF),
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: const Color(0xFF0A0E14),
+        primaryColor: const Color(0xFF6C63FF),
+        cardColor: const Color(0xFF1A1F2E),
+        dialogBackgroundColor: const Color(0xFF1A1F2E),
+        textTheme: const TextTheme(
+          titleLarge: TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+          bodyMedium: TextStyle(color: Colors.white70),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFF6C63FF),
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            elevation: 4,
+          ),
+        ),
       ),
       home: const HomeScreen(),
     );
