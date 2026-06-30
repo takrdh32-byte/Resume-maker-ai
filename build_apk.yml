@@ -24,15 +24,19 @@ jobs:
       - name: Create Flutter project
         run: flutter create --org com.recoverx.app --project-name recoverx .
 
-      - name: Copy lib and pubspec
+      - name: Remove default Android sources (v2 conflict)
+        run: rm -rf recoverx/android/app/src/main
+
+      - name: Copy our complete Android sources
+        run: cp -r android/app/src/main recoverx/android/app/src/
+
+      - name: Copy Flutter lib and pubspec
         run: |
           cp -r lib recoverx/
           cp pubspec.yaml recoverx/
 
-      - name: Copy native C++ and Kotlin sources
-        run: |
-          cp -r android/app/src/main recoverx/android/app/src/
-          cp android/app/build.gradle recoverx/android/app/
+      - name: Copy our custom build.gradle
+        run: cp android/app/build.gradle recoverx/android/app/
 
       - name: Install Flutter dependencies
         run: cd recoverx && flutter pub get
