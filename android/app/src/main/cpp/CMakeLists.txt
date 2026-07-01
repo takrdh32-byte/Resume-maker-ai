@@ -4,9 +4,9 @@ project("recoverx_native")
 add_library(
     recoverx_native
     SHARED
-    native-lib.cpp
-    jpeg_carver.cpp
+    media_carver.cpp
     neon_scanner.cpp
+    native-lib.cpp
 )
 
 if(${ANDROID_ABI} STREQUAL "armeabi-v7a")
