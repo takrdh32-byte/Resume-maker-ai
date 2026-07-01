@@ -14,9 +14,7 @@ class FullScreenPreview extends StatelessWidget {
     }
     try {
       final picturesDir = Directory('/storage/emulated/0/Pictures/RecoverX');
-      if (!await picturesDir.exists()) {
-        await picturesDir.create(recursive: true);
-      }
+      if (!await picturesDir.exists()) await picturesDir.create(recursive: true);
       final destPath = '${picturesDir.path}/recovered_${DateTime.now().millisecondsSinceEpoch}.jpg';
       await file.copy(destPath);
       if (context.mounted) {
@@ -34,26 +32,17 @@ class FullScreenPreview extends StatelessWidget {
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(backgroundColor: Colors.black, iconTheme: const IconThemeData(color: Colors.white)),
-      body: Center(
-        child: InteractiveViewer(
-          child: Image.file(File(photo.path), fit: BoxFit.contain),
-        ),
-      ),
+      body: Center(child: InteractiveViewer(child: Image.file(File(photo.path), fit: BoxFit.contain))),
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: SizedBox(
-            width: double.infinity,
-            height: 52,
+            width: double.infinity, height: 52,
             child: ElevatedButton.icon(
               onPressed: () => _saveToGallery(context),
               icon: const Icon(Icons.download),
               label: const Text('Save to Gallery'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF6C63FF),
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-              ),
+              style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFE53935), foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14))),
             ),
           ),
         ),
