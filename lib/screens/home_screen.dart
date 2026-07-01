@@ -5,7 +5,6 @@ import '../painters/logo_painter.dart';
 import 'scanning_screen.dart';
 import 'paywall_screen.dart';
 import 'deep_scan_screen.dart';
-import 'cloud_recovery_screen.dart';   // <-- नया इम्पोर्ट
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -83,10 +82,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     Navigator.push(context, MaterialPageRoute(builder: (_) => const DeepScanScreen()));
   }
 
-  void _openCloudRecovery() {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const CloudRecoveryScreen()));
-  }
-
   void _showPermissionDenied() async {
     final permanentlyDenied = await PermissionHelper.isPermanentlyDenied();
     if (!mounted) return;
@@ -161,21 +156,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                         onPressed: _openDeepScan,
                         icon: const Icon(Icons.folder_open, color: Color(0xFFE53935)),
                         label: const Text('Deep Scan (Choose Folder)',
-                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Color(0xFFE53935))),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFFE53935), width: 1.5),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    // Cloud Recovery बटन (नया)
-                    SizedBox(
-                      width: double.infinity, height: 56,
-                      child: OutlinedButton.icon(
-                        onPressed: _openCloudRecovery,
-                        icon: const Icon(Icons.cloud_download, color: Color(0xFFE53935)),
-                        label: const Text('Recover from Cloud',
                             style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Color(0xFFE53935))),
                         style: OutlinedButton.styleFrom(
                           side: const BorderSide(color: Color(0xFFE53935), width: 1.5),
