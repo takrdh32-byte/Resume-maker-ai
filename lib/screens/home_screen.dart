@@ -13,43 +13,17 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen> {
   bool _permissionGranted = false;
   bool _checkingPermission = true;
   bool _freeUsed = false;
   bool _isPro = false;
-
-  late final AnimationController _logoController;
-  late final AnimationController _buttonController;
 
   @override
   void initState() {
     super.initState();
     _requestPermissionsAtStart();
     _loadUserState();
-
-    _logoController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 10),
-    );
-    Future.delayed(const Duration(seconds: 2), () {
-      if (mounted) _logoController.repeat();
-    });
-
-    _buttonController = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 800),
-    );
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      if (mounted) _buttonController.forward();
-    });
-  }
-
-  @override
-  void dispose() {
-    _logoController.dispose();
-    _buttonController.dispose();
-    super.dispose();
   }
 
   Future<void> _loadUserState() async {
@@ -156,62 +130,61 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
               ),
               const Spacer(),
-              AnimatedBuilder(
-                animation: _logoController,
-                builder: (context, child) {
-                  return Transform(
-                    alignment: Alignment.center,
-                    transform: Matrix4.identity()
-                      ..setEntry(3, 2, 0.001)
-                      ..rotateY(_logoController.value * 3.14159 * 2),
-                    child: child,
-                  );
-                },
-                child: const CustomPaint(
-                  size: Size(100, 100),
-                  painter: LogoPainter(),
+
+              // ---------- स्टैटिक लोगो (बिना घुमाव) + सर्कल बॉर्डर ----------
+              Container(
+                width: 110,
+                height: 110,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: const Color(0xFFE53935).withOpacity(0.6),
+                    width: 2.5,
+                  ),
+                  // हल्का शैडो
+                  boxShadow: [
+                    BoxShadow(
+                      color: const Color(0xFFE53935).withOpacity(0.2),
+                      blurRadius: 12,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: const Padding(
+                  padding: EdgeInsets.all(5),
+                  child: CustomPaint(
+                    painter: LogoPainter(),
+                  ),
                 ),
               ),
+
               const SizedBox(height: 24),
               const Text(
                 'RecoverX',
                 style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
               ),
               const SizedBox(height: 24),
-              AnimatedBuilder(
-                animation: _buttonController,
-                builder: (context, child) {
-                  final curved = Curves.easeOutBack.transform(_buttonController.value);
-                  return Opacity(
-                    opacity: curved,
-                    child: Transform.translate(
-                      offset: Offset(0, 60 * (1 - curved)),
-                      child: child,
-                    ),
-                  );
-                },
-                child: Column(
-                  children: [
-                    _buildButton(),
-                    const SizedBox(height: 12),
-                    // नया Deep Scan बटन
-                    SizedBox(
-                      width: double.infinity,
-                      height: 56,
-                      child: OutlinedButton.icon(
-                        onPressed: _openDeepScan,
-                        icon: const Icon(Icons.folder_search, color: Color(0xFFE53935)),
-                        label: const Text('Deep Scan (Choose Folder)',
-                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Color(0xFFE53935))),
-                        style: OutlinedButton.styleFrom(
-                          side: const BorderSide(color: Color(0xFFE53935), width: 1.5),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                      ),
-                    ),
-                  ],
+
+              // ---------- बटन (बिना एनिमेशन) ----------
+              _buildButton(),
+              const SizedBox(height: 12),
+
+              // Deep Scan बटन
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: OutlinedButton.icon(
+                  onPressed: _openDeepScan,
+                  icon: const Icon(Icons.folder_open, color: Color(0xFFE53935)),
+                  label: const Text('Deep Scan (Choose Folder)',
+                      style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Color(0xFFE53935))),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFE53935), width: 1.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
                 ),
               ),
+
               const Spacer(),
             ],
           ),
