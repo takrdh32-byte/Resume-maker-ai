@@ -1,18 +1,21 @@
-bool findPattern(const uint8_t* buffer, size_t bufferSize, size_t startFrom,
-                 const uint8_t* pattern, size_t patternLen, size_t& foundPos) {
-    if (bufferSize < patternLen || startFrom + patternLen > bufferSize) return false;
+#ifndef RECOVERX_NEON_SCANNER_H
+#define RECOVERX_NEON_SCANNER_H
 
-    if (patternLen == 4) {
-        return findHeader4(buffer, bufferSize, startFrom, pattern, foundPos);
-    }
+#include <cstdint>
+#include <cstddef>
 
-    // For other lengths (2, 8, etc.), use scalar search.
-    // (We avoid findFooter2 to keep its existing semantics intact.)
-    for (size_t i = startFrom; i + patternLen <= bufferSize; ++i) {
-        if (memcmp(&buffer[i], pattern, patternLen) == 0) {
-            foundPos = i;
-            return true;
-        }
-    }
-    return false;
+namespace NeonScanner {
+
+    bool findHeader4(const uint8_t* buffer, size_t bufferSize, size_t startFrom,
+                     const uint8_t pattern[4], size_t& foundPos);
+    bool findFooter2(const uint8_t* buffer, size_t bufferSize, size_t startFrom,
+                     const uint8_t pattern[2], size_t& foundPos);
+    bool isNeonEnabled();
+
+    // Generic pattern search — variable length (2 to 16 bytes)
+    bool findPattern(const uint8_t* buffer, size_t bufferSize, size_t startFrom,
+                     const uint8_t* pattern, size_t patternLen, size_t& foundPos);
+
 }
+
+#endif
