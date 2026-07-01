@@ -4,20 +4,9 @@ import 'package:permission_handler/permission_handler.dart';
 class PermissionHelper {
   static Future<bool> requestStoragePermissions() async {
     if (!Platform.isAndroid) return false;
-
-    // Android 13+ के लिए नए मीडिया परमिशन
-    if (await Permission.photos.isDenied) {
-      await Permission.photos.request();
-    }
-    if (await Permission.videos.isDenied) {
-      await Permission.videos.request();
-    }
-
-    // पुराने Android के लिए स्टोरेज परमिशन
-    if (await Permission.storage.isDenied) {
-      await Permission.storage.request();
-    }
-
+    if (await Permission.photos.isDenied) await Permission.photos.request();
+    if (await Permission.videos.isDenied) await Permission.videos.request();
+    if (await Permission.storage.isDenied) await Permission.storage.request();
     return await hasMinimumPermissions();
   }
 
