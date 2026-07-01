@@ -89,27 +89,31 @@ jobs:
           </resources>
           EOF
 
-      # ----- 4. अब अपनी बाकी फ़ाइलें कॉपी करो -----
+      # ----- 4. अब अपनी बाकी फ़ाइलें कॉपी करो (हर कॉपी से पहले mkdir -p) -----
       - name: Copy custom AndroidManifest
         run: |
+          mkdir -p /tmp/build/android/app/src/main
           if [ -f android/app/src/main/AndroidManifest.xml ]; then
             cp android/app/src/main/AndroidManifest.xml /tmp/build/android/app/src/main/
           fi
 
       - name: Copy custom build.gradle
         run: |
+          mkdir -p /tmp/build/android/app
           if [ -f android/app/build.gradle ]; then
             cp android/app/build.gradle /tmp/build/android/app/
           fi
 
       - name: Copy native C++ sources
         run: |
+          mkdir -p /tmp/build/android/app/src/main/cpp
           if [ -d android/app/src/main/cpp ]; then
             cp -r android/app/src/main/cpp/* /tmp/build/android/app/src/main/cpp/
           fi
 
       - name: Copy Kotlin sources
         run: |
+          mkdir -p /tmp/build/android/app/src/main/kotlin
           if [ -d android/app/src/main/kotlin ]; then
             cp -r android/app/src/main/kotlin/* /tmp/build/android/app/src/main/kotlin/
           fi
