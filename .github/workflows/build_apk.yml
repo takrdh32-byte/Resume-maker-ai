@@ -26,6 +26,14 @@ jobs:
           rm -rf /tmp/build
           flutter create --org com.recoverx.app --project-name recoverx /tmp/build
 
+      # Flutter की डिफ़ॉल्ट आइकन फ़ाइलों को हटाएँ ताकि हमारी कस्टम फ़ाइलें बिना टकराव के काम करें
+      - name: Remove default icons
+        run: |
+          rm -f /tmp/build/android/app/src/main/res/mipmap-*/ic_launcher.png
+          rm -f /tmp/build/android/app/src/main/res/drawable/ic_launcher_foreground.xml
+          rm -f /tmp/build/android/app/src/main/res/drawable/ic_launcher_background.xml
+          rm -f /tmp/build/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+
       - name: Copy custom AndroidManifest
         run: |
           mkdir -p /tmp/build/android/app/src/main
