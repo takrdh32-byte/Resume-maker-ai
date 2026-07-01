@@ -4,6 +4,7 @@ import '../services/plan_manager.dart';
 import '../painters/logo_painter.dart';
 import 'scanning_screen.dart';
 import 'paywall_screen.dart';
+import 'deep_scan_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -98,6 +99,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     );
   }
 
+  void _openDeepScan() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const DeepScanScreen()),
+    );
+  }
+
   void _showPermissionDenied() async {
     final permanentlyDenied = await PermissionHelper.isPermanentlyDenied();
     if (!mounted) return;
@@ -182,7 +190,27 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     ),
                   );
                 },
-                child: _buildButton(),
+                child: Column(
+                  children: [
+                    _buildButton(),
+                    const SizedBox(height: 12),
+                    // नया Deep Scan बटन
+                    SizedBox(
+                      width: double.infinity,
+                      height: 56,
+                      child: OutlinedButton.icon(
+                        onPressed: _openDeepScan,
+                        icon: const Icon(Icons.folder_search, color: Color(0xFFE53935)),
+                        label: const Text('Deep Scan (Choose Folder)',
+                            style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Color(0xFFE53935))),
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Color(0xFFE53935), width: 1.5),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const Spacer(),
             ],
