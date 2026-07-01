@@ -12,11 +12,6 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Setup Python & Generate Icons
-        run: |
-          pip install Pillow
-          python scripts/generate_icon.py
-
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -59,7 +54,6 @@ jobs:
             cp -r android/app/src/main/kotlin/* /tmp/build/android/app/src/main/kotlin/
           fi
 
-      # ---------- नया स्टेप: res फोल्डर (icons/styles) कॉपी करो ----------
       - name: Copy res folder (icons, styles)
         run: |
           if [ -d android/app/src/main/res ]; then
