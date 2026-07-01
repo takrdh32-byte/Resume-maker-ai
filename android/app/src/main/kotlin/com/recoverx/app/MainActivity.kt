@@ -9,8 +9,8 @@ import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.Executors
 
 class MainActivity : FlutterActivity() {
-    private val METHOD_CHANNEL = "recoverx/native"
-    private val EVENT_CHANNEL = "recoverx/native_events"
+    private val METHOD_CHANNEL = "com.recoverx.app/native"   // वही चैनल जो Dart उपयोग करता है
+    private val EVENT_CHANNEL = "com.recoverx.app/scan_progress"
 
     private var eventSink: EventChannel.EventSink? = null
     private val scanExecutor = Executors.newSingleThreadExecutor()
@@ -22,45 +22,18 @@ class MainActivity : FlutterActivity() {
 
     // ---------- JNI prototypes ----------
     external fun getEngineVersion(): String
-    external fun startScanSession(maxFileSizeMb: Int, threadCount: Int): Int
-    external fun scanFileInSession(sessionId: Int, path: String, listener: NativeListener?): Int
-    external fun runDeepScan(sessionId: Int, folderPath: String, maxResults: Int, listener: NativeListener?)
-    external fun stopScanSession(sessionId: Int)
-    external fun releaseCarver(sessionId: Int)
+    external fun initCarver(outputDir: String, ramTier: Int)
+    external fun releaseCarver()
+    external fun scanFileWithCarver(sourcePath: String, listener: CarvedFileListener?): Int
 
-    // ---------- NativeListener that emits events to Flutter ----------
-    private inner class FlutterNativeListener : NativeListener {
-        override fun onResult(thumbBytes: ByteArray, mediaType: String, sizeBytes: Long) {
+    // ---------- CarvedFileListener को EventChannel पर भेजना ----------
+    private val fileListener = object : CarvedFileListener {
+        override fun onFileFound(path: String, sizeBytes: Long) {
             mainHandler.post {
                 eventSink?.success(mapOf(
                     "type" to "result",
-                    "bytes" to thumbBytes,
-                    "mediaType" to mediaType,
-                    "sizeBytes" to sizeBytes
-                ))
-            }
-        }
-
-        override fun onProgress(filesScanned: Long, bytesProcessed: Long,
-                                totalEstimate: Long, filesRecovered: Long, etaSeconds: Double) {
-            mainHandler.post {
-                eventSink?.success(mapOf(
-                    "type" to "progress",
-                    "filesScanned" to filesScanned,
-                    "bytesProcessed" to bytesProcessed,
-                    "totalBytesEstimate" to totalEstimate,
-                    "filesRecovered" to filesRecovered,
-                    "etaSeconds" to etaSeconds
-                ))
-            }
-        }
-
-        override fun onError(code: String, message: String) {
-            mainHandler.post {
-                eventSink?.success(mapOf(
-                    "type" to "error",
-                    "code" to code,
-                    "message" to message
+                    "path" to path,
+                    "size" to sizeBytes
                 ))
             }
         }
@@ -69,7 +42,7 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        // Event channel setup
+        // Event channel for real-time results
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, EVENT_CHANNEL)
             .setStreamHandler(object : EventChannel.StreamHandler {
                 override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
@@ -80,8 +53,6 @@ class MainActivity : FlutterActivity() {
                 }
             })
 
-        val listener = FlutterNativeListener()
-
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, METHOD_CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -91,12 +62,17 @@ class MainActivity : FlutterActivity() {
                     }
 
                     "startScanSession" -> {
-                        val maxFileSizeMb = call.argument<Int>("maxFileSizeMb") ?: 30
-                        val threadCount = call.argument<Int>("threadCount") ?: 0
+                        val outputDir = call.argument<String>("outputDir") ?: ""
+                        if (outputDir.isEmpty()) {
+                            result.error("INVALID_ARGS", "outputDir missing", null)
+                            return@setMethodCallHandler
+                        }
+                        java.io.File(outputDir).mkdirs()
+                        val ramTier = 2 // हाई RAM (तुम DeviceMemoryHelper भी लगा सकते हो)
                         scanExecutor.execute {
                             try {
-                                val sessionId = startScanSession(maxFileSizeMb, threadCount)
-                                mainHandler.post { result.success(sessionId) }
+                                initCarver(outputDir, ramTier)
+                                mainHandler.post { result.success(true) }
                             } catch (e: Exception) {
                                 mainHandler.post { result.error("NATIVE_ERROR", e.message, null) }
                             }
@@ -104,45 +80,28 @@ class MainActivity : FlutterActivity() {
                     }
 
                     "scanFileInSession" -> {
-                        val sessionId = call.argument<Int>("sessionId") ?: -1
-                        val path = call.argument<String>("path") ?: ""
+                        val sourcePath = call.argument<String>("sourcePath") ?: ""
+                        if (sourcePath.isEmpty()) {
+                            result.error("INVALID_ARGS", "sourcePath missing", null)
+                            return@setMethodCallHandler
+                        }
                         scanExecutor.execute {
                             try {
-                                val count = scanFileInSession(sessionId, path, listener)
-                                mainHandler.post { result.success(count) }
+                                val count = scanFileWithCarver(sourcePath, fileListener)
+                                mainHandler.post {
+                                    if (count == -2) result.error("FILE_TOO_LARGE", "File exceeds 100MB", null)
+                                    else result.success(count)
+                                }
                             } catch (e: Exception) {
                                 mainHandler.post { result.error("NATIVE_ERROR", e.message, null) }
                             }
                         }
                     }
 
-                    "runDeepScan" -> {
-                        val sessionId = call.argument<Int>("sessionId") ?: -1
-                        val folderPath = call.argument<String>("folderPath") ?: ""
-                        val maxResults = call.argument<Int>("maxResults") ?: 200
+                    "endScanSession" -> {
                         scanExecutor.execute {
-                            try {
-                                runDeepScan(sessionId, folderPath, maxResults, listener)
-                                mainHandler.post { result.success(null) }
-                            } catch (e: Exception) {
-                                mainHandler.post { result.error("NATIVE_ERROR", e.message, null) }
-                            }
-                        }
-                    }
-
-                    "stopScanSession" -> {
-                        val sessionId = call.argument<Int>("sessionId") ?: -1
-                        scanExecutor.execute {
-                            stopScanSession(sessionId)
-                            mainHandler.post { result.success(null) }
-                        }
-                    }
-
-                    "releaseCarver" -> {
-                        val sessionId = call.argument<Int>("sessionId") ?: -1
-                        scanExecutor.execute {
-                            releaseCarver(sessionId)
-                            mainHandler.post { result.success(null) }
+                            releaseCarver()
+                            mainHandler.post { result.success(true) }
                         }
                     }
 
