@@ -26,7 +26,7 @@ jobs:
           rm -rf /tmp/build
           flutter create --org com.recoverx.app --project-name recoverx /tmp/build
 
-      # Flutter की डिफ़ॉल्ट आइकन फ़ाइलों को हटाएँ ताकि हमारी कस्टम फ़ाइलें बिना टकराव के काम करें
+      # ----- 1. डिफ़ॉल्ट आइकन हटाओ -----
       - name: Remove default icons
         run: |
           rm -f /tmp/build/android/app/src/main/res/mipmap-*/ic_launcher.png
@@ -34,38 +34,84 @@ jobs:
           rm -f /tmp/build/android/app/src/main/res/drawable/ic_launcher_background.xml
           rm -f /tmp/build/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
 
+      # ----- 2. अपना आइकन बनाओ (लाल-सफ़ेद "R") -----
+      - name: Generate custom icon
+        run: |
+          mkdir -p /tmp/build/android/app/src/main/res/drawable
+          mkdir -p /tmp/build/android/app/src/main/res/mipmap-anydpi-v26
+
+          # लाल गोले पर सफ़ेद R
+          cat << 'EOF' > /tmp/build/android/app/src/main/res/drawable/ic_launcher_foreground.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector xmlns:android="http://schemas.android.com/apk/res/android"
+              android:width="108dp"
+              android:height="108dp"
+              android:viewportWidth="108"
+              android:viewportHeight="108">
+              <path
+                  android:fillColor="#E53935"
+                  android:pathData="M54,54m-40,0a40,40 0,1 1,80 0a40,40 0,1 1,-80 0" />
+              <path
+                  android:fillColor="#FFFFFF"
+                  android:pathData="M40,72 L40,36 L54,36 Q66,36 66,48 Q60,54 54,54 L66,72 L58,72 L46,56 L40,56 L40,72 Z" />
+          </vector>
+          EOF
+
+          # लाल बैकग्राउंड
+          cat << 'EOF' > /tmp/build/android/app/src/main/res/drawable/ic_launcher_background.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <shape xmlns:android="http://schemas.android.com/apk/res/android">
+              <solid android:color="#E53935" />
+          </shape>
+          EOF
+
+          # एडाप्टिव आइकन XML
+          cat << 'EOF' > /tmp/build/android/app/src/main/res/mipmap-anydpi-v26/ic_launcher.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@drawable/ic_launcher_background" />
+              <foreground android:drawable="@drawable/ic_launcher_foreground" />
+          </adaptive-icon>
+          EOF
+
+      # ----- 3. कस्टम स्टाइल (काली स्प्लैश) -----
+      - name: Generate custom styles
+        run: |
+          cat << 'EOF' > /tmp/build/android/app/src/main/res/values/styles.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <resources>
+              <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+                  <item name="android:windowBackground">@android:color/black</item>
+              </style>
+              <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
+                  <item name="android:windowBackground">@android:color/black</item>
+              </style>
+          </resources>
+          EOF
+
+      # ----- 4. अब अपनी बाकी फ़ाइलें कॉपी करो -----
       - name: Copy custom AndroidManifest
         run: |
-          mkdir -p /tmp/build/android/app/src/main
           if [ -f android/app/src/main/AndroidManifest.xml ]; then
             cp android/app/src/main/AndroidManifest.xml /tmp/build/android/app/src/main/
           fi
 
       - name: Copy custom build.gradle
         run: |
-          mkdir -p /tmp/build/android/app
           if [ -f android/app/build.gradle ]; then
             cp android/app/build.gradle /tmp/build/android/app/
           fi
 
       - name: Copy native C++ sources
         run: |
-          mkdir -p /tmp/build/android/app/src/main/cpp
           if [ -d android/app/src/main/cpp ]; then
             cp -r android/app/src/main/cpp/* /tmp/build/android/app/src/main/cpp/
           fi
 
       - name: Copy Kotlin sources
         run: |
-          mkdir -p /tmp/build/android/app/src/main/kotlin
           if [ -d android/app/src/main/kotlin ]; then
             cp -r android/app/src/main/kotlin/* /tmp/build/android/app/src/main/kotlin/
-          fi
-
-      - name: Copy res folder (icons, styles)
-        run: |
-          if [ -d android/app/src/main/res ]; then
-            cp -r android/app/src/main/res /tmp/build/android/app/src/main/res
           fi
 
       - name: Copy Flutter lib and pubspec
