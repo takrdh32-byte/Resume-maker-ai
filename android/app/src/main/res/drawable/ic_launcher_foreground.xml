@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- लाल गोला बैकग्राउंड -->
+    <path
+        android:fillColor="#E53935"
+        android:pathData="M54,54m-40,0a40,40 0,1 1,80 0a40,40 0,1 1,-80 0" />
+
+    <!-- सफ़ेद "R" अक्षर -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M42,30L42,78M42,54L58,54M58,30L58,54L42,54M58,54L66,78" />
+</vector>
