@@ -27,17 +27,14 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     _requestPermissionsAtStart();
     _loadUserState();
 
-    // लोगो का घुमाव — धीरे-धीरे शुरू होगा और लगातार चलेगा
     _logoController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 10),
     );
-    // शुरुआत में 2 सेकंड तक लोगो स्थिर, फिर धीरे-धीरे घूमना शुरू
     Future.delayed(const Duration(seconds: 2), () {
       if (mounted) _logoController.repeat();
     });
 
-    // बटन और टेक्स्ट 1.5 सेकंड बाद नीचे से ऊपर आएँगे
     _buttonController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 800),
@@ -151,8 +148,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 ),
               ),
               const Spacer(),
-
-              // ---------- घूमता हुआ लोगो ----------
               AnimatedBuilder(
                 animation: _logoController,
                 builder: (context, child) {
@@ -169,15 +164,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   painter: LogoPainter(),
                 ),
               ),
-
               const SizedBox(height: 24),
               const Text(
                 'RecoverX',
                 style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
               ),
               const SizedBox(height: 24),
-
-              // ---------- बटन (नीचे से ऊपर आता हुआ) ----------
               AnimatedBuilder(
                 animation: _buttonController,
                 builder: (context, child) {
