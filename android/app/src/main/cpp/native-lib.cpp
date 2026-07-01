@@ -1,9 +1,11 @@
 #include <jni.h>
 #include <string>
 #include <vector>
+#include <memory>
+#include <mutex>
+#include <unordered_map>
+#include <atomic>
 #include <cstdio>
-#include <climits>
-#include <fstream>
 #include <android/log.h>
 #include "media_carver.h"
 
@@ -13,111 +15,143 @@
 
 using namespace recoverx;
 
-static std::unique_ptr<MediaCarver> g_carver;
-static std::string g_outputDir;
+// ---------- session registry ----------
+struct NativeSession {
+    std::unique_ptr<MediaCarver> carver;
+    std::unique_ptr<CarveSession> session;
+    std::string outputDir;
+};
 
-static void invokeJavaCallback(JNIEnv* env, jobject listenerObj,
-                                const std::string& path, jlong sizeBytes) {
-    if (listenerObj == nullptr) return;
-    jclass listenerClass = env->GetObjectClass(listenerObj);
-    jmethodID onFileFound = env->GetMethodID(listenerClass, "onFileFound",
-                                              "(Ljava/lang/String;J)V");
-    if (onFileFound == nullptr) {
-        env->ExceptionClear();
-        env->DeleteLocalRef(listenerClass);
-        return;
-    }
-    jstring jPath = env->NewStringUTF(path.c_str());
-    env->CallVoidMethod(listenerObj, onFileFound, jPath, sizeBytes);
-    env->DeleteLocalRef(jPath);
-    env->DeleteLocalRef(listenerClass);
+static std::mutex g_sessionsMutex;
+static std::unordered_map<int32_t, std::shared_ptr<NativeSession>> g_sessions;
+static std::atomic<int32_t> g_nextSessionId{1};
+
+static std::shared_ptr<NativeSession> getSession(int32_t id) {
+    std::lock_guard<std::mutex> lock(g_sessionsMutex);
+    auto it = g_sessions.find(id);
+    return (it != g_sessions.end()) ? it->second : nullptr;
 }
 
-static std::string saveCarvedFile(const CarvedFile& cf) {
-    static int counter = 0;
-    counter++;
-    std::string ext;
+// ---------- helper to invoke Java listener ----------
+static void invokeResult(JNIEnv* env, jobject listener, const CarvedFile& cf) {
+    if (listener == nullptr) return;
+    jclass cls = env->GetObjectClass(listener);
+    jmethodID mid = env->GetMethodID(cls, "onResult", "([BLjava/lang/String;J)V");
+    if (mid == nullptr) { env->ExceptionClear(); env->DeleteLocalRef(cls); return; }
+
+    jbyteArray bytes = env->NewByteArray(cf.data.size());
+    env->SetByteArrayRegion(bytes, 0, cf.data.size(), (const jbyte*)cf.data.data());
+
+    const char* typeStr = "bin";
     switch (cf.type) {
-        case MediaType::JPEG: ext = ".jpg"; break;
-        case MediaType::PNG:  ext = ".png"; break;
-        case MediaType::MP4:  ext = ".mp4"; break;
-        default: ext = ".bin"; break;
+        case MediaType::JPEG: typeStr = "jpeg"; break;
+        case MediaType::PNG:  typeStr = "png"; break;
+        case MediaType::MP4:  typeStr = "mp4"; break;
+        default: break;
     }
-    std::string path = g_outputDir + "/recovered_" + std::to_string(counter) + ext;
-    std::ofstream out(path, std::ios::binary);
-    if (out.is_open()) {
-        out.write(reinterpret_cast<const char*>(cf.data.data()), cf.data.size());
-        out.close();
-        return path;
-    }
-    return "";
+    jstring jType = env->NewStringUTF(typeStr);
+    env->CallVoidMethod(listener, mid, bytes, jType, (jlong)cf.data.size());
+    env->DeleteLocalRef(bytes);
+    env->DeleteLocalRef(jType);
+    env->DeleteLocalRef(cls);
 }
 
-extern "C" JNIEXPORT jstring JNICALL
+static void invokeProgress(JNIEnv* env, jobject listener, const ScanProgress& p) {
+    if (listener == nullptr) return;
+    jclass cls = env->GetObjectClass(listener);
+    jmethodID mid = env->GetMethodID(cls, "onProgress", "(JJJJD)V");
+    if (mid == nullptr) { env->ExceptionClear(); env->DeleteLocalRef(cls); return; }
+    env->CallVoidMethod(listener, mid,
+        (jlong)p.filesScanned, (jlong)p.bytesProcessed,
+        (jlong)p.totalBytesEstimate, (jlong)p.filesRecovered, p.etaSeconds);
+    env->DeleteLocalRef(cls);
+}
+
+static void invokeError(JNIEnv* env, jobject listener, const char* code, const char* message) {
+    if (listener == nullptr) return;
+    jclass cls = env->GetObjectClass(listener);
+    jmethodID mid = env->GetMethodID(cls, "onError", "(Ljava/lang/String;Ljava/lang/String;)V");
+    if (mid == nullptr) { env->ExceptionClear(); env->DeleteLocalRef(cls); return; }
+    jstring jCode = env->NewStringUTF(code);
+    jstring jMsg = env->NewStringUTF(message);
+    env->CallVoidMethod(listener, mid, jCode, jMsg);
+    env->DeleteLocalRef(jCode);
+    env->DeleteLocalRef(jMsg);
+    env->DeleteLocalRef(cls);
+}
+
+// ---------- JNI implementations ----------
+
+extern "C" {
+
+JNIEXPORT jstring JNICALL
 Java_com_recoverx_app_MainActivity_getEngineVersion(JNIEnv* env, jobject) {
     return env->NewStringUTF("RecoverX Engine v3.0 (media_carver, NEON-MP4)");
 }
 
-extern "C" JNIEXPORT void JNICALL
-Java_com_recoverx_app_MainActivity_initCarver(JNIEnv* env, jobject,
-                                               jstring outputDir, jint /*ramTier*/) {
-    const char* dir = env->GetStringUTFChars(outputDir, nullptr);
-    if (dir == nullptr) return;
-    g_outputDir = dir;
-    g_carver.reset(new MediaCarver(100LL * 1024 * 1024));
-    env->ReleaseStringUTFChars(outputDir, dir);
-    LOGI("initCarver: outputDir = %s", g_outputDir.c_str());
+JNIEXPORT jint JNICALL
+Java_com_recoverx_app_MainActivity_startScanSession(JNIEnv* env, jobject,
+                                                      jint maxFileSizeMb, jint threadCount) {
+    auto ns = std::make_shared<NativeSession>();
+    size_t maxBytes = static_cast<size_t>(maxFileSizeMb) * 1024ULL * 1024ULL;
+    ns->carver = std::make_unique<MediaCarver>(maxBytes);
+    ns->session = std::make_unique<CarveSession>(maxBytes, static_cast<unsigned>(threadCount));
+
+    int32_t id = g_nextSessionId.fetch_add(1);
+    std::lock_guard<std::mutex> lock(g_sessionsMutex);
+    g_sessions[id] = ns;
+    return id;
 }
 
-extern "C" JNIEXPORT void JNICALL
-Java_com_recoverx_app_MainActivity_releaseCarver(JNIEnv*, jobject) {
-    g_carver.reset();
-    g_outputDir.clear();
-    LOGI("releaseCarver: engine released");
-}
+JNIEXPORT jint JNICALL
+Java_com_recoverx_app_MainActivity_scanFileInSession(JNIEnv* env, jobject,
+                                                       jint sessionId, jstring jPath,
+                                                       jobject listener) {
+    auto ns = getSession(sessionId);
+    if (!ns || !ns->carver) return -1;
 
-extern "C" JNIEXPORT jint JNICALL
-Java_com_recoverx_app_MainActivity_scanFileWithCarver(
-        JNIEnv* env, jobject, jstring sourcePath, jobject listener) {
-
-    if (!g_carver) {
-        LOGE("scanFileWithCarver: carver not initialized");
-        return -1;
-    }
-
-    const char* path = env->GetStringUTFChars(sourcePath, nullptr);
-    if (path == nullptr) return -1;
-
-    FILE* fp = fopen(path, "rb");
-    if (!fp) { env->ReleaseStringUTFChars(sourcePath, path); return -1; }
-    fseek(fp, 0, SEEK_END);
-    long sz = ftell(fp);
-    fclose(fp);
-    if (sz < 0) { env->ReleaseStringUTFChars(sourcePath, path); return -1; }
-    if (sz > 100LL * 1024 * 1024) {
-        env->ReleaseStringUTFChars(sourcePath, path);
-        return -2;
-    }
-
-    jobject globalListener = (listener != nullptr) ? env->NewGlobalRef(listener) : nullptr;
+    const char* path = env->GetStringUTFChars(jPath, nullptr);
     int filesFound = 0;
 
-    CarveError err = g_carver->scanFile(path,
-        [&](const CarvedFile& cf) {
-            filesFound++;
-            std::string savedPath = saveCarvedFile(cf);
-            if (!savedPath.empty() && globalListener) {
-                invokeJavaCallback(env, globalListener, savedPath,
-                                   static_cast<jlong>(cf.data.size()));
-            }
-        });
+    ns->carver->scanFile(path, [&](const CarvedFile& cf) {
+        filesFound++;
+        invokeResult(env, listener, cf);
+    });
 
-    if (globalListener) env->DeleteGlobalRef(globalListener);
-    env->ReleaseStringUTFChars(sourcePath, path);
-
-    if (err != CarveError::NONE) {
-        LOGE("scanFileWithCarver: error code %d", static_cast<int>(err));
-        return -1;
-    }
-    return static_cast<jint>(filesFound);
+    env->ReleaseStringUTFChars(jPath, path);
+    return filesFound;
 }
+
+JNIEXPORT void JNICALL
+Java_com_recoverx_app_MainActivity_runDeepScan(JNIEnv* env, jobject,
+                                                jint sessionId, jstring jFolderPath,
+                                                jint maxResults, jobject listener) {
+    auto ns = getSession(sessionId);
+    if (!ns || !ns->session) return;
+
+    const char* folderPath = env->GetStringUTFChars(jFolderPath, nullptr);
+
+    // walk folder
+    std::vector<std::string> paths;
+    // (simplified: you already have FolderScanner in Dart, but keep for native deep scan if needed)
+    // Here we rely on Dart side already sending files via scanFileInSession.
+    // For deep scan, we can just set the folder as output dir and let Dart walk.
+    // So we do nothing here — Dart will call scanFileInSession for each file.
+
+    env->ReleaseStringUTFChars(jFolderPath, folderPath);
+}
+
+JNIEXPORT void JNICALL
+Java_com_recoverx_app_MainActivity_stopScanSession(JNIEnv*, jobject, jint sessionId) {
+    auto ns = getSession(sessionId);
+    if (ns && ns->session) ns->session->stop();
+    if (ns && ns->carver) ns->carver->requestStop();
+}
+
+JNIEXPORT void JNICALL
+Java_com_recoverx_app_MainActivity_releaseCarver(JNIEnv*, jobject, jint sessionId) {
+    std::lock_guard<std::mutex> lock(g_sessionsMutex);
+    g_sessions.erase(sessionId);
+}
+
+} // extern "C"
