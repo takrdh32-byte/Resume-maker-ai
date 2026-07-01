@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'screens/home_screen.dart';
 import 'services/billing_service.dart';
-import 'painters/logo_painter.dart';   // <-- यहाँ से लाएँगे
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,57 +35,8 @@ class RecoverXApp extends StatelessWidget {
           ),
         ),
       ),
-      home: const SplashScreen(),
-    );
-  }
-}
-
-// ---------- स्प्लैश स्क्रीन (2 सेकंड) ----------
-class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
-
-  @override
-  State<SplashScreen> createState() => _SplashScreenState();
-}
-
-class _SplashScreenState extends State<SplashScreen> {
-  @override
-  void initState() {
-    super.initState();
-    Future.delayed(const Duration(seconds: 2), () {
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const HomeScreen()),
-      );
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0A0E14),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const CustomPaint(
-              size: Size(120, 120),
-              painter: LogoPainter(),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'RecoverX',
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-                letterSpacing: -0.5,
-              ),
-            ),
-          ],
-        ),
-      ),
+      // सीधा HomeScreen, कोई SplashScreen नहीं
+      home: const HomeScreen(),
     );
   }
 }
