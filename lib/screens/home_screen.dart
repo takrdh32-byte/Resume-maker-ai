@@ -12,13 +12,14 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
+class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _permissionGranted = false;
   bool _checkingPermission = true;
   bool _freeUsed = false;
   bool _isPro = false;
 
-  late final AnimationController _rotationController;
+  late final AnimationController _logoController;
+  late final AnimationController _buttonController;
 
   @override
   void initState() {
@@ -26,16 +27,30 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     _requestPermissionsAtStart();
     _loadUserState();
 
-    // लोगो को लगातार धीरे-धीरे घुमाने के लिए
-    _rotationController = AnimationController(
+    // लोगो का घुमाव — धीरे-धीरे शुरू होगा और लगातार चलेगा
+    _logoController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 10),  // 10 सेकंड में एक चक्कर
-    )..repeat();
+      duration: const Duration(seconds: 10),
+    );
+    // शुरुआत में 2 सेकंड तक लोगो स्थिर, फिर धीरे-धीरे घूमना शुरू
+    Future.delayed(const Duration(seconds: 2), () {
+      if (mounted) _logoController.repeat();
+    });
+
+    // बटन और टेक्स्ट 1.5 सेकंड बाद नीचे से ऊपर आएँगे
+    _buttonController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 800),
+    );
+    Future.delayed(const Duration(milliseconds: 1500), () {
+      if (mounted) _buttonController.forward();
+    });
   }
 
   @override
   void dispose() {
-    _rotationController.dispose();
+    _logoController.dispose();
+    _buttonController.dispose();
     super.dispose();
   }
 
@@ -120,7 +135,6 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Column(
             children: [
-              // Upgrade बटन
               Align(
                 alignment: Alignment.topRight,
                 child: TextButton.icon(
@@ -140,13 +154,13 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
 
               // ---------- घूमता हुआ लोगो ----------
               AnimatedBuilder(
-                animation: _rotationController,
+                animation: _logoController,
                 builder: (context, child) {
                   return Transform(
                     alignment: Alignment.center,
                     transform: Matrix4.identity()
-                      ..setEntry(3, 2, 0.001)       // परिप्रेक्ष्य (perspective)
-                      ..rotateY(_rotationController.value * 3.14159 * 2), // Y-अक्ष पर घुमाएँ
+                      ..setEntry(3, 2, 0.001)
+                      ..rotateY(_logoController.value * 3.14159 * 2),
                     child: child,
                   );
                 },
@@ -161,28 +175,23 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
                 'RecoverX',
                 style: TextStyle(fontSize: 32, fontWeight: FontWeight.bold, color: Colors.white),
               ),
-              const SizedBox(height: 8),
-              const Text(
-                'Recover deleted photos & videos instantly\nNo internet, no root required',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 14, color: Colors.white60),
-              ),
               const SizedBox(height: 24),
 
-              if (_checkingPermission)
-                const CircularProgressIndicator(color: Color(0xFFE53935))
-              else ...[
-                if (!_isPro && _freeUsed)
-                  _buildUpgradeButton()
-                else
-                  _buildStartButton(),
-                const SizedBox(height: 12),
-                const Text(
-                  'Disclaimer: Recovery depends on device cache. Not all deleted files may be recoverable.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 11, color: Colors.white38),
-                ),
-              ],
+              // ---------- बटन (नीचे से ऊपर आता हुआ) ----------
+              AnimatedBuilder(
+                animation: _buttonController,
+                builder: (context, child) {
+                  final curved = Curves.easeOutBack.transform(_buttonController.value);
+                  return Opacity(
+                    opacity: curved,
+                    child: Transform.translate(
+                      offset: Offset(0, 60 * (1 - curved)),
+                      child: child,
+                    ),
+                  );
+                },
+                child: _buildButton(),
+              ),
               const Spacer(),
             ],
           ),
@@ -191,18 +200,38 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
+  Widget _buildButton() {
+    if (_checkingPermission) {
+      return const CircularProgressIndicator(color: Color(0xFFE53935));
+    }
+    if (!_isPro && _freeUsed) {
+      return _buildUpgradeButton();
+    }
+    return _buildStartButton();
+  }
+
   Widget _buildStartButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 56,
-      child: ElevatedButton(
-        onPressed: _permissionGranted ? _onStartRecoveryPressed : null,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFFE53935),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+    return Column(
+      children: [
+        SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: ElevatedButton(
+            onPressed: _permissionGranted ? _onStartRecoveryPressed : null,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFFE53935),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            ),
+            child: const Text('Start Recovery', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Colors.white)),
+          ),
         ),
-        child: const Text('Start Recovery', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, color: Colors.white)),
-      ),
+        const SizedBox(height: 12),
+        const Text(
+          'Disclaimer: Recovery depends on device cache. Not all deleted files may be recoverable.',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 11, color: Colors.white38),
+        ),
+      ],
     );
   }
 
