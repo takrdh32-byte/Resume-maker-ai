@@ -5,7 +5,7 @@
     android:viewportWidth="108"
     android:viewportHeight="108">
 
-    <!-- लाल गोला बैकग्राउंड -->
+    <!-- लाल गोला -->
     <path
         android:fillColor="#E53935"
         android:pathData="M54,54m-40,0a40,40 0,1 1,80 0a40,40 0,1 1,-80 0" />
@@ -13,5 +13,5 @@
     <!-- सफ़ेद "R" अक्षर -->
     <path
         android:fillColor="#FFFFFF"
-        android:pathData="M42,30L42,78M42,54L58,54M58,30L58,54L42,54M58,54L66,78" />
+        android:pathData="M40,72 L40,36 L54,36 Q66,36 66,48 Q60,54 54,54 L66,72 L58,72 L46,56 L40,56 L40,72 Z" />
 </vector>
