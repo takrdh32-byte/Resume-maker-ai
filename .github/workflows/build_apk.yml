@@ -36,8 +36,6 @@ jobs:
           mkdir -p /tmp/build/android/app/src/main
           if [ -f android/app/src/main/AndroidManifest.xml ]; then
             cp android/app/src/main/AndroidManifest.xml /tmp/build/android/app/src/main/
-          else
-            echo "Warning: AndroidManifest.xml not found, using default"
           fi
 
       - name: Copy custom build.gradle
@@ -45,8 +43,6 @@ jobs:
           mkdir -p /tmp/build/android/app
           if [ -f android/app/build.gradle ]; then
             cp android/app/build.gradle /tmp/build/android/app/
-          else
-            echo "Warning: build.gradle not found, using default"
           fi
 
       - name: Copy native C++ sources
@@ -54,8 +50,6 @@ jobs:
           mkdir -p /tmp/build/android/app/src/main/cpp
           if [ -d android/app/src/main/cpp ]; then
             cp -r android/app/src/main/cpp/* /tmp/build/android/app/src/main/cpp/
-          else
-            echo "Warning: cpp folder not found"
           fi
 
       - name: Copy Kotlin sources
@@ -63,8 +57,13 @@ jobs:
           mkdir -p /tmp/build/android/app/src/main/kotlin
           if [ -d android/app/src/main/kotlin ]; then
             cp -r android/app/src/main/kotlin/* /tmp/build/android/app/src/main/kotlin/
-          else
-            echo "Warning: kotlin folder not found"
+          fi
+
+      # ---------- नया स्टेप: res फोल्डर (icons/styles) कॉपी करो ----------
+      - name: Copy res folder (icons, styles)
+        run: |
+          if [ -d android/app/src/main/res ]; then
+            cp -r android/app/src/main/res /tmp/build/android/app/src/main/res
           fi
 
       - name: Copy Flutter lib and pubspec
