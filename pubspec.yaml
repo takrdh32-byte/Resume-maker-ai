@@ -1,5 +1,5 @@
 name: recoverx
-description: Photo & Cloud Recovery Engine
+description: Photo Recovery Engine
 version: 1.0.0+1
 
 environment:
@@ -13,10 +13,6 @@ dependencies:
   in_app_purchase: ^3.2.0
   shared_preferences: ^2.2.3
   file_picker: ^8.0.0
-  google_sign_in: ^6.2.1
-  googleapis: ^13.2.0
-  googleapis_auth: ^1.6.0
-  http: ^1.2.2
 
 dev_dependencies:
   flutter_test:
