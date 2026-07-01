@@ -1,14 +1,27 @@
 import 'package:flutter/material.dart';
-import '../services/plan_manager.dart';
+import '../services/billing_service.dart';
 
 class PaywallScreen extends StatelessWidget {
   final VoidCallback onUnlocked;
   const PaywallScreen({super.key, required this.onUnlocked});
 
-  void _purchaseMonthly(BuildContext context) {
-    PlanManager.setMonthlyPlan();
-    Navigator.pop(context);
-    onUnlocked();
+  Future<void> _purchaseMonthly(BuildContext context) async {
+    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Connecting to Play Store...')));
+    try {
+      final success = await BillingService.buyMonthlySubscription();
+      if (context.mounted) {
+        if (success) {
+          Navigator.pop(context);
+          onUnlocked();
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Purchase failed or cancelled')));
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      }
+    }
   }
 
   @override
@@ -24,20 +37,12 @@ class PaywallScreen extends StatelessWidget {
         padding: const EdgeInsets.all(24),
         child: Column(
           children: [
-            const Icon(Icons.lock_open_rounded, size: 64, color: Color(0xFF6C63FF)),
+            const Icon(Icons.lock_open_rounded, size: 64, color: Color(0xFFE53935)),
             const SizedBox(height: 16),
-            const Text(
-              'Recover unlimited deleted photos',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white),
-            ),
+            const Text('Recover unlimited deleted photos', textAlign: TextAlign.center, style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.white)),
             const SizedBox(height: 8),
-            const Text(
-              'No ads, full privacy, offline recovery',
-              style: TextStyle(fontSize: 14, color: Colors.white60),
-            ),
+            const Text('No ads, full privacy, offline recovery', style: TextStyle(fontSize: 14, color: Colors.white60)),
             const SizedBox(height: 32),
-            // सिर्फ एक मंथली प्लान
             Card(
               color: const Color(0xFF238636),
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
