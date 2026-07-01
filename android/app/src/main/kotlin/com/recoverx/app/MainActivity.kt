@@ -4,16 +4,15 @@ import android.os.Handler
 import android.os.Looper
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
-import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.EventChannel
-import java.io.File
+import io.flutter.plugin.common.MethodChannel
 import java.util.concurrent.Executors
 
 class MainActivity : FlutterActivity() {
-    private val METHOD_CHANNEL = "com.recoverx.app/native"
-    private val EVENT_CHANNEL = "com.recoverx.app/scan_progress"
+    private val METHOD_CHANNEL = "recoverx/native"
+    private val EVENT_CHANNEL = "recoverx/native_events"
 
-    private var progressSink: EventChannel.EventSink? = null
+    private var eventSink: EventChannel.EventSink? = null
     private val scanExecutor = Executors.newSingleThreadExecutor()
     private val mainHandler = Handler(Looper.getMainLooper())
 
@@ -21,25 +20,67 @@ class MainActivity : FlutterActivity() {
         init { System.loadLibrary("recoverx_native") }
     }
 
+    // ---------- JNI prototypes ----------
     external fun getEngineVersion(): String
-    external fun initCarver(outputDir: String, ramTier: Int)
-    external fun releaseCarver()
-    external fun scanFileWithCarver(sourcePath: String, listener: CarvedFileListener?): Int
+    external fun startScanSession(maxFileSizeMb: Int, threadCount: Int): Int
+    external fun scanFileInSession(sessionId: Int, path: String, listener: NativeListener?): Int
+    external fun runDeepScan(sessionId: Int, folderPath: String, maxResults: Int, listener: NativeListener?)
+    external fun stopScanSession(sessionId: Int)
+    external fun releaseCarver(sessionId: Int)
+
+    // ---------- NativeListener that emits events to Flutter ----------
+    private inner class FlutterNativeListener : NativeListener {
+        override fun onResult(thumbBytes: ByteArray, mediaType: String, sizeBytes: Long) {
+            mainHandler.post {
+                eventSink?.success(mapOf(
+                    "type" to "result",
+                    "bytes" to thumbBytes,
+                    "mediaType" to mediaType,
+                    "sizeBytes" to sizeBytes
+                ))
+            }
+        }
+
+        override fun onProgress(filesScanned: Long, bytesProcessed: Long,
+                                totalEstimate: Long, filesRecovered: Long, etaSeconds: Double) {
+            mainHandler.post {
+                eventSink?.success(mapOf(
+                    "type" to "progress",
+                    "filesScanned" to filesScanned,
+                    "bytesProcessed" to bytesProcessed,
+                    "totalBytesEstimate" to totalEstimate,
+                    "filesRecovered" to filesRecovered,
+                    "etaSeconds" to etaSeconds
+                ))
+            }
+        }
+
+        override fun onError(code: String, message: String) {
+            mainHandler.post {
+                eventSink?.success(mapOf(
+                    "type" to "error",
+                    "code" to code,
+                    "message" to message
+                ))
+            }
+        }
+    }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
+        // Event channel setup
         EventChannel(flutterEngine.dartExecutor.binaryMessenger, EVENT_CHANNEL)
             .setStreamHandler(object : EventChannel.StreamHandler {
-                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) { progressSink = events }
-                override fun onCancel(arguments: Any?) { progressSink = null }
+                override fun onListen(arguments: Any?, events: EventChannel.EventSink?) {
+                    eventSink = events
+                }
+                override fun onCancel(arguments: Any?) {
+                    eventSink = null
+                }
             })
 
-        val fileListener = object : CarvedFileListener {
-            override fun onFileFound(path: String, sizeBytes: Long) {
-                mainHandler.post { progressSink?.success(mapOf("path" to path, "size" to sizeBytes)) }
-            }
-        }
+        val listener = FlutterNativeListener()
 
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, METHOD_CHANNEL)
             .setMethodCallHandler { call, result ->
@@ -50,17 +91,12 @@ class MainActivity : FlutterActivity() {
                     }
 
                     "startScanSession" -> {
-                        val outputDir = call.argument<String>("outputDir") ?: ""
-                        if (outputDir.isEmpty()) {
-                            result.error("INVALID_ARGS", "outputDir missing", null)
-                            return@setMethodCallHandler
-                        }
-                        File(outputDir).mkdirs()
-                        val ramTier = DeviceMemoryHelper.detectRamTier(applicationContext)
+                        val maxFileSizeMb = call.argument<Int>("maxFileSizeMb") ?: 30
+                        val threadCount = call.argument<Int>("threadCount") ?: 0
                         scanExecutor.execute {
                             try {
-                                initCarver(outputDir, ramTier)
-                                mainHandler.post { result.success(true) }
+                                val sessionId = startScanSession(maxFileSizeMb, threadCount)
+                                mainHandler.post { result.success(sessionId) }
                             } catch (e: Exception) {
                                 mainHandler.post { result.error("NATIVE_ERROR", e.message, null) }
                             }
@@ -68,28 +104,45 @@ class MainActivity : FlutterActivity() {
                     }
 
                     "scanFileInSession" -> {
-                        val sourcePath = call.argument<String>("sourcePath") ?: ""
-                        if (sourcePath.isEmpty()) {
-                            result.error("INVALID_ARGS", "sourcePath missing", null)
-                            return@setMethodCallHandler
-                        }
+                        val sessionId = call.argument<Int>("sessionId") ?: -1
+                        val path = call.argument<String>("path") ?: ""
                         scanExecutor.execute {
                             try {
-                                val count = scanFileWithCarver(sourcePath, fileListener)
-                                mainHandler.post {
-                                    if (count == -2) result.error("FILE_TOO_LARGE", "File exceeds 100MB", null)
-                                    else result.success(count)
-                                }
+                                val count = scanFileInSession(sessionId, path, listener)
+                                mainHandler.post { result.success(count) }
                             } catch (e: Exception) {
                                 mainHandler.post { result.error("NATIVE_ERROR", e.message, null) }
                             }
                         }
                     }
 
-                    "endScanSession" -> {
+                    "runDeepScan" -> {
+                        val sessionId = call.argument<Int>("sessionId") ?: -1
+                        val folderPath = call.argument<String>("folderPath") ?: ""
+                        val maxResults = call.argument<Int>("maxResults") ?: 200
                         scanExecutor.execute {
-                            releaseCarver()
-                            mainHandler.post { result.success(true) }
+                            try {
+                                runDeepScan(sessionId, folderPath, maxResults, listener)
+                                mainHandler.post { result.success(null) }
+                            } catch (e: Exception) {
+                                mainHandler.post { result.error("NATIVE_ERROR", e.message, null) }
+                            }
+                        }
+                    }
+
+                    "stopScanSession" -> {
+                        val sessionId = call.argument<Int>("sessionId") ?: -1
+                        scanExecutor.execute {
+                            stopScanSession(sessionId)
+                            mainHandler.post { result.success(null) }
+                        }
+                    }
+
+                    "releaseCarver" -> {
+                        val sessionId = call.argument<Int>("sessionId") ?: -1
+                        scanExecutor.execute {
+                            releaseCarver(sessionId)
+                            mainHandler.post { result.success(null) }
                         }
                     }
 
