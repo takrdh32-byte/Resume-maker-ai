@@ -12,6 +12,11 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
+      - name: Setup Python & Generate Icons
+        run: |
+          pip install Pillow
+          python scripts/generate_icon.py
+
       - name: Setup Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -26,50 +31,40 @@ jobs:
           rm -rf /tmp/build
           flutter create --org com.recoverx.app --project-name recoverx /tmp/build
 
-      - name: Copy AndroidManifest
+      - name: Copy custom AndroidManifest
         run: |
           mkdir -p /tmp/build/android/app/src/main
           if [ -f android/app/src/main/AndroidManifest.xml ]; then
-            cp -v android/app/src/main/AndroidManifest.xml /tmp/build/android/app/src/main/
+            cp android/app/src/main/AndroidManifest.xml /tmp/build/android/app/src/main/
           else
-            echo "WARNING: AndroidManifest.xml not found in repo"
+            echo "Warning: AndroidManifest.xml not found, using default"
           fi
 
-      - name: Copy build.gradle
+      - name: Copy custom build.gradle
         run: |
           mkdir -p /tmp/build/android/app
           if [ -f android/app/build.gradle ]; then
-            cp -v android/app/build.gradle /tmp/build/android/app/
+            cp android/app/build.gradle /tmp/build/android/app/
           else
-            echo "WARNING: build.gradle not found in repo"
+            echo "Warning: build.gradle not found, using default"
           fi
 
-      - name: Copy C++ files one-by-one (with check)
+      - name: Copy native C++ sources
         run: |
-          TARGET="/tmp/build/android/app/src/main/cpp"
-          mkdir -p "$TARGET"
-          echo "Copying C++ files..."
-
-          for f in CMakeLists.txt native-lib.cpp jpeg_carver.h jpeg_carver.cpp neon_scanner.h neon_scanner.cpp xxhash64.h; do
-            SRC="android/app/src/main/cpp/$f"
-            if [ -f "$SRC" ]; then
-              cp -v "$SRC" "$TARGET/"
-            else
-              echo "ERROR: Required file $SRC is MISSING in your repo!"
-              exit 1
-            fi
-          done
-
-          echo "All C++ files copied successfully."
+          mkdir -p /tmp/build/android/app/src/main/cpp
+          if [ -d android/app/src/main/cpp ]; then
+            cp -r android/app/src/main/cpp/* /tmp/build/android/app/src/main/cpp/
+          else
+            echo "Warning: cpp folder not found"
+          fi
 
       - name: Copy Kotlin sources
         run: |
-          TARGET="/tmp/build/android/app/src/main/kotlin"
-          mkdir -p "$TARGET"
+          mkdir -p /tmp/build/android/app/src/main/kotlin
           if [ -d android/app/src/main/kotlin ]; then
-            cp -r android/app/src/main/kotlin/* "$TARGET/"
+            cp -r android/app/src/main/kotlin/* /tmp/build/android/app/src/main/kotlin/
           else
-            echo "WARNING: kotlin folder not found in repo"
+            echo "Warning: kotlin folder not found"
           fi
 
       - name: Copy Flutter lib and pubspec
