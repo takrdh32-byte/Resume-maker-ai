@@ -8,117 +8,62 @@
     #define RECOVERX_HAS_NEON 0
 #endif
 
-namespace NeonScanner {
+namespace neon {
 
-bool isNeonEnabled() { return RECOVERX_HAS_NEON; }
-
-// ---------- Scalar helpers ----------
-static bool findHeader4Scalar(const uint8_t* buffer, size_t bufferSize, size_t startFrom,
-                               const uint8_t pattern[4], size_t& foundPos) {
-    if (startFrom + 4 > bufferSize) return false;
-    for (size_t i = startFrom; i + 4 <= bufferSize; i++) {
-        if (memcmp(&buffer[i], pattern, 4) == 0) { foundPos = i; return true; }
-    }
-    return false;
-}
-
-static bool findFooter2Scalar(const uint8_t* buffer, size_t bufferSize, size_t startFrom,
-                               const uint8_t pattern[2], size_t& foundPos) {
-    if (startFrom + 2 > bufferSize) return false;
-    for (size_t i = startFrom; i + 2 <= bufferSize; i++) {
-        if (buffer[i] == pattern[0] && buffer[i + 1] == pattern[1]) { foundPos = i + 2; return true; }
-    }
-    return false;
-}
+int64_t findPattern(const uint8_t* data, size_t length, size_t searchFrom,
+                     const uint8_t* pattern, size_t patternLen) {
+    if (data == nullptr || pattern == nullptr) return -1;
+    if (patternLen < 2 || patternLen > 16) return -1;  // हम 2–16 बाइट सपोर्ट करते हैं
+    if (searchFrom + patternLen > length) return -1;
 
 #if RECOVERX_HAS_NEON
+    // NEON-त्वरित खोज: पहले बाइट को 16 लेन में चेक करो
+    const uint8_t firstByte = pattern[0];
+    const size_t limit = length - patternLen;
 
-// ---------- NEON-accelerated 4-byte header search ----------
-bool findHeader4(const uint8_t* buffer, size_t bufferSize, size_t startFrom,
-                  const uint8_t pattern[4], size_t& foundPos) {
-    if (bufferSize < 4 || startFrom + 4 > bufferSize) return false;
-    size_t i = startFrom, limit = bufferSize - 4;
-    uint8x16_t firstByteVec = vdupq_n_u8(pattern[0]);
+    size_t i = searchFrom;
+    while (i + 16 + patternLen <= length && i <= limit) {
+        uint8x16_t chunk = vld1q_u8(&data[i]);
+        uint8x16_t cmp = vceqq_u8(chunk, vdupq_n_u8(firstByte));
 
-    while (i + 16 + 3 <= bufferSize && i <= limit) {
-        uint8x16_t chunk = vld1q_u8(&buffer[i]);
-        uint8x16_t cmp = vceqq_u8(chunk, firstByteVec);
+        // मास्क से 16 लेन का परिणाम निकालो
         uint8_t maskBytes[16];
         vst1q_u8(maskBytes, cmp);
-        for (int lane = 0; lane < 16; lane++) {
+
+        for (int lane = 0; lane < 16; ++lane) {
             if (maskBytes[lane] != 0) {
                 size_t candidate = i + lane;
                 if (candidate > limit) continue;
-                if (buffer[candidate + 1] == pattern[1] &&
-                    buffer[candidate + 2] == pattern[2] &&
-                    buffer[candidate + 3] == pattern[3]) {
-                    foundPos = candidate;
-                    return true;
+                // पूरे पैटर्न का स्केलर वेरिफिकेशन
+                bool match = true;
+                for (size_t k = 0; k < patternLen; ++k) {
+                    if (data[candidate + k] != pattern[k]) {
+                        match = false;
+                        break;
+                    }
                 }
+                if (match) return static_cast<int64_t>(candidate);
             }
         }
         i += 16;
     }
-    return findHeader4Scalar(buffer, bufferSize, i, pattern, foundPos);
-}
 
-// ---------- NEON-accelerated 2-byte footer search ----------
-bool findFooter2(const uint8_t* buffer, size_t bufferSize, size_t startFrom,
-                  const uint8_t pattern[2], size_t& foundPos) {
-    if (bufferSize < 2 || startFrom + 2 > bufferSize) return false;
-    size_t i = startFrom, limit = bufferSize - 2;
-    uint8x16_t firstByteVec = vdupq_n_u8(pattern[0]);
-    while (i + 16 + 1 <= bufferSize && i <= limit) {
-        uint8x16_t chunk = vld1q_u8(&buffer[i]);
-        uint8x16_t cmp = vceqq_u8(chunk, firstByteVec);
-        uint8_t maskBytes[16];
-        vst1q_u8(maskBytes, cmp);
-        for (int lane = 0; lane < 16; lane++) {
-            if (maskBytes[lane] != 0) {
-                size_t candidate = i + lane;
-                if (candidate > limit) continue;
-                if (buffer[candidate + 1] == pattern[1]) { foundPos = candidate + 2; return true; }
-            }
-        }
-        i += 16;
-    }
-    return findFooter2Scalar(buffer, bufferSize, i, pattern, foundPos);
-}
-
-#else  // !RECOVERX_HAS_NEON — scalar fallback
-
-bool findHeader4(const uint8_t* buffer, size_t bufferSize, size_t startFrom,
-                  const uint8_t pattern[4], size_t& foundPos) {
-    return findHeader4Scalar(buffer, bufferSize, startFrom, pattern, foundPos);
-}
-
-bool findFooter2(const uint8_t* buffer, size_t bufferSize, size_t startFrom,
-                  const uint8_t pattern[2], size_t& foundPos) {
-    return findFooter2Scalar(buffer, bufferSize, startFrom, pattern, foundPos);
-}
-
-#endif // RECOVERX_HAS_NEON
-
-// ---------- Generic variable-length pattern search ----------
-bool findPattern(const uint8_t* buffer, size_t bufferSize, size_t startFrom,
-                 const uint8_t* pattern, size_t patternLen, size_t& foundPos) {
-    if (bufferSize < patternLen || startFrom + patternLen > bufferSize) return false;
-
-    // Use the existing NEON-optimised function for 4-byte headers
-    if (patternLen == 4) {
-        return findHeader4(buffer, bufferSize, startFrom, pattern, foundPos);
-    }
-
-    // For all other lengths (2, 8, etc.), use a scalar loop.
-    // (We avoid calling findFooter2 because it returns the position *after*
-    // the footer, which would break the generic contract of findPattern.)
-    for (size_t i = startFrom; i + patternLen <= bufferSize; ++i) {
-        if (memcmp(&buffer[i], pattern, patternLen) == 0) {
-            foundPos = i;
-            return true;
+    // बचे हुए बाइट्स के लिए स्केलर फ़ॉलबैक
+    for (; i <= limit; ++i) {
+        if (memcmp(&data[i], pattern, patternLen) == 0) {
+            return static_cast<int64_t>(i);
         }
     }
-    return false;
+    return -1;
+#else
+    // स्केलर इम्प्लीमेंटेशन (x86, एमुलेटर, आदि)
+    for (size_t i = searchFrom; i + patternLen <= length; ++i) {
+        if (memcmp(&data[i], pattern, patternLen) == 0) {
+            return static_cast<int64_t>(i);
+        }
+    }
+    return -1;
+#endif
 }
 
-}  // namespace NeonScanner
+}  // namespace neon
