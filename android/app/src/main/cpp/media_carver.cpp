@@ -156,7 +156,7 @@ size_t MediaCarver::extractJpeg(const uint8_t* data, size_t length, size_t start
                                  const CarveResultCallback& onResult, size_t globalOffset) {
     for (const auto& hdr : kJpegHeaderVariants) {
         int64_t pos = neon::findPattern(data, length, start, hdr, 4);
-        if (pos != static_cast<int64_t>(start)) continue;   // header must be exactly at cursor
+        if (pos != static_cast<int64_t>(start)) continue;
 
         int64_t footerPos = neon::findPattern(data, length, start + 4, kJpegFooter, 2);
         if (footerPos < 0) return 0;
@@ -186,7 +186,7 @@ size_t MediaCarver::extractPng(const uint8_t* data, size_t length, size_t start,
     int64_t iendPos = neon::findPattern(data, length, start + 8, kPngFooterTag, 4);
     if (iendPos < 0) return 0;
 
-    size_t end = static_cast<size_t>(iendPos) + 4 + 4;   // IEND chunk total length
+    size_t end = static_cast<size_t>(iendPos) + 4 + 4;
     if (end > length) return 0;
 
     CarvedFile cf;
@@ -203,7 +203,6 @@ size_t MediaCarver::extractPng(const uint8_t* data, size_t length, size_t start,
 
 size_t MediaCarver::extractMp4(const uint8_t* data, size_t length, size_t start,
                                 const CarveResultCallback& onResult, size_t globalOffset) {
-    // ftyp box: [4-byte size][ 'f' 't' 'y' 'p' ][4-byte brand]
     int64_t tagPos = neon::findPattern(data, length, start + 4, kFtypTag, 4);
     if (tagPos != static_cast<int64_t>(start + 4)) return 0;
     if (start < 4) return 0;
