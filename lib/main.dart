@@ -4,7 +4,9 @@ import 'services/billing_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await BillingService.initialize();
+  try {
+    await BillingService.initialize();
+  } catch (_) {}
   runApp(const RecoverXApp());
 }
 
@@ -35,7 +37,6 @@ class RecoverXApp extends StatelessWidget {
           ),
         ),
       ),
-      // सीधा HomeScreen, कोई SplashScreen नहीं
       home: const HomeScreen(),
     );
   }
