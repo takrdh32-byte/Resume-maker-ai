@@ -6,7 +6,6 @@ class PlanManager {
   static PlanType _currentPlan = PlanType.free;
   static DateTime? _expiry;
 
-  // ऐप शुरू होते ही पिछला प्लान लोड करो
   static Future<void> loadFromStorage() async {
     final prefs = await SharedPreferences.getInstance();
     final planStr = prefs.getString('plan_type') ?? 'free';
@@ -32,7 +31,7 @@ class PlanManager {
 
   static void setMonthlyPlan() {
     _currentPlan = PlanType.monthly;
-    _expiry = DateTime.now().add(const Duration(days: 30)); // 30 दिन
+    _expiry = DateTime.now().add(const Duration(days: 30));
     _saveToStorage();
   }
 
@@ -53,12 +52,9 @@ class PlanManager {
   }
 
   static void checkExpiry() {
-    if (isExpired) {
-      setFreePlan();
-    }
+    if (isExpired) setFreePlan();
   }
 
-  // फ्री ट्रायल चेक (पहले से है, कोई बदलाव नहीं)
   static Future<bool> hasUsedFree() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool('free_used') ?? false;
