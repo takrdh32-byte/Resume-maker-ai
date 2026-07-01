@@ -66,16 +66,23 @@ class _ScanningScreenState extends State<ScanningScreen> {
       final savedPaths = prefs.getStringList('recovered_paths') ?? [];
       final excludeSet = savedPaths.toSet();
 
-      final files = await FolderScanner.collectFiles(excludePaths: excludeSet);
-      if (files.isEmpty || _stopped) {
+      // नया FolderScanner अब CandidateFile लौटाता है
+      final candidates = await FolderScanner().collectFiles();
+
+      // पहले से रिकवर हो चुके पाथ को छोड़ो
+      final filesToScan = candidates
+          .where((c) => !excludeSet.contains(c.path))
+          .toList();
+
+      if (filesToScan.isEmpty || _stopped) {
         await RecoverXBridge.endScanSession();
         _showResultsIfMounted();
         return;
       }
 
-      for (final file in files) {
+      for (final candidate in filesToScan) {
         if (_stopped) break;
-        await RecoverXBridge.scanFileInSession(sourcePath: file.path);
+        await RecoverXBridge.scanFileInSession(sourcePath: candidate.path);
         if (_found.length >= _maxPhotos) break;
       }
 
@@ -131,19 +138,30 @@ class _ScanningScreenState extends State<ScanningScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               if (!_scanFailed && !_stopped) ...[
-                const SizedBox(width: 64, height: 64, child: CircularProgressIndicator(strokeWidth: 4, color: Color(0xFFE53935))),
+                const SizedBox(width: 64, height: 64,
+                    child: CircularProgressIndicator(strokeWidth: 4, color: Color(0xFFE53935))),
                 const SizedBox(height: 24),
-                Text(_statusText, style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w500)),
+                Text(_statusText,
+                    style: const TextStyle(fontSize: 18, color: Colors.white, fontWeight: FontWeight.w500)),
                 const SizedBox(height: 8),
-                Text('Phone ko hilao mat, scan chal raha hai', style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.4))),
+                Text('Phone ko hilao mat, scan chal raha hai',
+                    style: TextStyle(fontSize: 13, color: Colors.white.withOpacity(0.4))),
                 const SizedBox(height: 32),
-                SizedBox(width: double.infinity, height: 48, child: ElevatedButton(onPressed: _stopScan, style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))), child: const Text('Stop Scan', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)))),
+                SizedBox(width: double.infinity, height: 48,
+                    child: ElevatedButton(onPressed: _stopScan,
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                        child: const Text('Stop Scan', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600, color: Colors.white)))),
               ] else if (_stopped) ...[
                 const Icon(Icons.check_circle_outline, size: 56, color: Color(0xFFE53935)),
                 const SizedBox(height: 16),
-                Text('Scan ruk gaya. ${_found.length} photos mili.', textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 16)),
+                Text('Scan ruk gaya. ${_found.length} photos mili.',
+                    textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 16)),
                 const SizedBox(height: 24),
-                ElevatedButton(onPressed: () { Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => ResultsScreen(photos: _found))); }, child: const Text('Dekho')),
+                ElevatedButton(onPressed: () {
+                  Navigator.pushReplacement(context,
+                      MaterialPageRoute(builder: (_) => ResultsScreen(photos: _found)));
+                }, child: const Text('Dekho')),
               ] else ...[
                 const Icon(Icons.error_outline, size: 56, color: Colors.redAccent),
                 const SizedBox(height: 16),
