@@ -23,7 +23,6 @@ class _DeepScanScreenState extends State<DeepScanScreen> {
   @override
   void initState() {
     super.initState();
-    // रियल-टाइम प्रोग्रेस सुनें
     RecoverXBridge.scanProgressStream.listen((event) {
       if (!mounted || _stopped) return;
       final path = event['path'] as String?;
@@ -44,7 +43,6 @@ class _DeepScanScreenState extends State<DeepScanScreen> {
   }
 
   Future<void> _pickAndScan() async {
-    // SAF से फोल्डर चुनने दें
     String? selectedDir = await FilePicker.platform.getDirectoryPath();
     if (selectedDir == null) return;
 
@@ -70,7 +68,6 @@ class _DeepScanScreenState extends State<DeepScanScreen> {
         if (entity is File) {
           processed++;
           setState(() => _statusText = 'Scanning... $processed files checked');
-          // हर फ़ाइल C++ कार्वर को भेजो — वही JPEG/PNG पहचानेगा
           await RecoverXBridge.scanFileInSession(sourcePath: entity.path);
         }
       }
@@ -78,7 +75,6 @@ class _DeepScanScreenState extends State<DeepScanScreen> {
 
     await RecoverXBridge.endScanSession();
 
-    // अगर स्ट्रीम से कुछ नहीं आया तो आउटपुट डायरेक्टरी चेक करें
     if (_found.isEmpty) {
       final outDir = Directory(outputDir);
       if (await outDir.exists()) {
@@ -91,11 +87,9 @@ class _DeepScanScreenState extends State<DeepScanScreen> {
 
     setState(() {
       _scanning = false;
-      if (_found.isEmpty) {
-        _statusText = 'No recoverable photos found in this folder.';
-      } else {
-        _statusText = 'Scan complete. ${_found.length} photos found.';
-      }
+      _statusText = _found.isEmpty
+          ? 'No recoverable photos found in this folder.'
+          : 'Scan complete. ${_found.length} photos found.';
     });
 
     if (mounted && _found.isNotEmpty) {
@@ -140,7 +134,7 @@ class _DeepScanScreenState extends State<DeepScanScreen> {
                   child: const Text('Stop Scan'),
                 ),
               ] else ...[
-                const Icon(Icons.folder_search, size: 72, color: Color(0xFFE53935)),
+                const Icon(Icons.folder_open, size: 72, color: Color(0xFFE53935)),
                 const SizedBox(height: 16),
                 const Text('Deep Scan any folder for hidden/deleted photos',
                     textAlign: TextAlign.center,
